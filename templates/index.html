@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>坦克大战 - 经典红白机游戏</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-header">
+            <h1>坦克大战</h1>
+            <div class="game-info">
+                <div class="info-item">
+                    <span>关卡:</span>
+                    <span id="level">1</span>
+                </div>
+                <div class="info-item">
+                    <span>分数:</span>
+                    <span id="score">0</span>
+                </div>
+                <div class="info-item">
+                    <span>生命:</span>
+                    <span id="lives">3</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="game-canvas-container">
+            <canvas id="gameCanvas" width="520" height="520"></canvas>
+            <div id="gameOverlay" class="game-overlay hidden">
+                <div class="overlay-content">
+                    <h2 id="overlayTitle">游戏开始</h2>
+                    <p id="overlayMessage">按空格键开始游戏</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="game-controls">
+            <div class="control-section">
+                <h3>操作说明</h3>
+                <div class="control-key">
+                    <span class="key">W</span>
+                    <span class="key">A</span>
+                    <span class="key">S</span>
+                    <span class="key">D</span>
+                    <span>或 方向键</span>
+                    <span>移动</span>
+                </div>
+                <div class="control-key">
+                    <span class="key">空格键</span>
+                    <span>发射子弹</span>
+                </div>
+                <div class="control-key">
+                    <span class="key">P</span>
+                    <span>暂停游戏</span>
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <h3>地图元素</h3>
+                <div class="map-elements">
+                    <div class="element">
+                        <div class="element-preview brick"></div>
+                        <span>砖墙 - 可击毁</span>
+                    </div>
+                    <div class="element">
+                        <div class="element-preview steel"></div>
+                        <span>钢墙 - 不可击毁</span>
+                    </div>
+                    <div class="element">
+                        <div class="element-preview water"></div>
+                        <span>水域 - 不可通过</span>
+                    </div>
+                    <div class="element">
+                        <div class="element-preview grass"></div>
+                        <span>草地 - 可伪装</span>
+                    </div>
+                    <div class="element">
+                        <div class="element-preview base"></div>
+                        <span>基地 - 保护目标</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/js/game.js"></script>
+</body>
+</html>

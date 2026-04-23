@@ -37,6 +37,7 @@ class Problem(db.Model):
     difficulty = db.Column(db.String(20), nullable=False)
     function_name = db.Column(db.String(100), nullable=False)
     test_cases = db.Column(db.Text, nullable=False)
+    correct_answer = db.Column(db.Text, nullable=True)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -64,6 +65,33 @@ class Problem(db.Model):
             'hard': '困难'
         }
         return difficulty_map.get(self.difficulty, self.difficulty)
+
+    def get_failed_submissions_count(self, user_id):
+        failed_statuses = [
+            Submission.STATUS_WRONG_ANSWER,
+            Submission.STATUS_TIME_LIMIT_EXCEEDED,
+            Submission.STATUS_RUNTIME_ERROR,
+            Submission.STATUS_COMPILE_ERROR,
+        ]
+        return Submission.query.filter_by(
+            user_id=user_id,
+            problem_id=self.id
+        ).filter(Submission.status.in_(failed_statuses)).count()
+
+    def has_accepted_submission(self, user_id):
+        return Submission.query.filter_by(
+            user_id=user_id,
+            problem_id=self.id,
+            status=Submission.STATUS_ACCEPTED
+        ).count() > 0
+
+    def can_show_hint(self, user_id):
+        if self.has_accepted_submission(user_id):
+            return False
+        if not self.correct_answer:
+            return False
+        failed_count = self.get_failed_submissions_count(user_id)
+        return failed_count >= 3
 
     def __repr__(self):
         return f'<Problem {self.id}: {self.title}>'

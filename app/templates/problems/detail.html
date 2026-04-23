@@ -7,7 +7,7 @@
     <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
         <div>
             <h1 class="page-title">#{{ problem.id }}. {{ problem.title }}</h1>
-            <div style="display: flex; gap: 1rem; align-items: center;">
+            <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
                 <span class="difficulty-{{ problem.difficulty }}">
                     {{ problem.get_difficulty_display() }}
                 </span>
@@ -16,9 +16,29 @@
                         上次提交: {{ user_submission.get_status_display() }}
                     </span>
                 {% endif %}
+                {% if current_user.is_authenticated and failed_count > 0 and not problem.has_accepted_submission(current_user.id) %}
+                    <span class="text-warning" style="font-weight: 500;">
+                        失败次数: {{ failed_count }} / 3
+                        {% if failed_count >= 3 %}
+                            <span class="text-danger">（可查看提示）</span>
+                        {% endif %}
+                    </span>
+                {% endif %}
             </div>
         </div>
     </div>
+    
+    {% if show_correct_answer and problem.correct_answer %}
+    <div class="card" style="margin-bottom: 1.5rem; border: 2px solid #17a2b8;">
+        <div class="card-header" style="background: #17a2b8; color: white;">
+            <strong>💡 正确答案提示</strong>
+            <small style="margin-left: 0.5rem;">请先理解思路，再独立完成代码</small>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            <pre style="margin: 0; padding: 1rem; background: #f8f9fa; border-radius: 0; overflow-x: auto;"><code style="font-family: 'Fira Code', monospace; font-size: 14px; color: #28a745;">{{ problem.correct_answer }}</code></pre>
+        </div>
+    </div>
+    {% endif %}
     
     <div class="row">
         <div class="col-6">
@@ -47,7 +67,17 @@
         
         <div class="col-6">
             <div class="card">
-                <div class="card-header">代码编辑器</div>
+                <div class="card-header">
+                    代码编辑器
+                    {% if can_show_hint and not show_correct_answer and problem.correct_answer %}
+                    <form method="POST" action="{{ url_for('problems.show_hint', problem_id=problem.id) }}" style="display: inline; margin-left: 1rem;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-outline-info btn-sm" onclick="return confirm('确定要查看正确答案吗？建议先再尝试一次！');">
+                            🔍 查看正确答案
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
                 {% if current_user.is_authenticated %}
                 <form method="POST" action="{{ url_for('problems.submit', problem_id=problem.id) }}">
                     <div class="form-group">
@@ -66,6 +96,17 @@ def {{ problem.function_name }}(参数):
                         >{% if user_submission %}{{ user_submission.code }}{% endif %}</textarea>
                         <div class="form-text">
                             请编写一个名为 <code>{{ problem.function_name }}</code> 的函数来解决问题。
+                            {% if current_user.is_authenticated and not problem.has_accepted_submission(current_user.id) %}
+                                <br>
+                                <small class="text-muted">
+                                    {% set remaining = 3 - failed_count %}
+                                    {% if remaining > 0 %}
+                                        再失败 {{ remaining }} 次后可查看正确答案提示。
+                                    {% else %}
+                                        已达到失败次数上限，可查看正确答案提示。
+                                    {% endif %}
+                                </small>
+                            {% endif %}
                         </div>
                     </div>
                     <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.75rem; font-size: 1.1rem;">

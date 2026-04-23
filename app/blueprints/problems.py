@@ -51,16 +51,26 @@ def detail(problem_id):
     sample_test_cases = [tc for tc in test_cases if not tc.get('hidden', False)]
     
     user_submission = None
+    failed_count = 0
+    can_show_hint = False
+    show_correct_answer = False
+    
     if current_user.is_authenticated:
         user_submission = Submission.query.filter_by(
             user_id=current_user.id,
             problem_id=problem_id
         ).order_by(Submission.created_at.desc()).first()
+        
+        failed_count = problem.get_failed_submissions_count(current_user.id)
+        can_show_hint = problem.can_show_hint(current_user.id)
     
     return render_template('problems/detail.html',
                          problem=problem,
                          sample_test_cases=sample_test_cases,
-                         user_submission=user_submission)
+                         user_submission=user_submission,
+                         failed_count=failed_count,
+                         can_show_hint=can_show_hint,
+                         show_correct_answer=show_correct_answer)
 
 
 @problems.route('/<int:problem_id>/submit', methods=['POST'])
@@ -127,6 +137,36 @@ def submission_detail(submission_id):
                          submission=submission,
                          test_results=test_results,
                          problem=submission.problem)
+
+
+@problems.route('/<int:problem_id>/hint', methods=['POST'])
+@login_required
+def show_hint(problem_id):
+    problem = Problem.query.get_or_404(problem_id)
+    if not problem.is_active:
+        abort(404)
+    
+    if not problem.can_show_hint(current_user.id):
+        flash('还没有达到查看提示的条件。', 'warning')
+        return redirect(url_for('problems.detail', problem_id=problem_id))
+    
+    test_cases = problem.get_test_cases_list()
+    sample_test_cases = [tc for tc in test_cases if not tc.get('hidden', False)]
+    
+    user_submission = Submission.query.filter_by(
+        user_id=current_user.id,
+        problem_id=problem_id
+    ).order_by(Submission.created_at.desc()).first()
+    
+    failed_count = problem.get_failed_submissions_count(current_user.id)
+    
+    return render_template('problems/detail.html',
+                         problem=problem,
+                         sample_test_cases=sample_test_cases,
+                         user_submission=user_submission,
+                         failed_count=failed_count,
+                         can_show_hint=True,
+                         show_correct_answer=True)
 
 
 @problems.route('/submissions')

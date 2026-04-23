@@ -39,6 +39,7 @@ class ProblemForm(FlaskForm):
     test_cases = TextAreaField('测试用例 (JSON格式)', validators=[
         DataRequired()
     ])
+    correct_answer = TextAreaField('正确答案 (Python代码)')
     is_active = BooleanField('启用')
     submit = SubmitField('保存')
 
@@ -109,6 +110,7 @@ def problem_create():
             difficulty=form.difficulty.data,
             function_name=form.function_name.data,
             test_cases=form.test_cases.data,
+            correct_answer=form.correct_answer.data or None,
             is_active=form.is_active.data
         )
         db.session.add(problem)
@@ -133,6 +135,7 @@ def problem_edit(problem_id):
         problem.difficulty = form.difficulty.data
         problem.function_name = form.function_name.data
         problem.test_cases = form.test_cases.data
+        problem.correct_answer = form.correct_answer.data or None
         problem.is_active = form.is_active.data
         db.session.commit()
         

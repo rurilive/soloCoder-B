@@ -26,6 +26,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from flask import Flask, request, jsonify, g
 from datetime import datetime
+from typing import Optional, Dict, List, Tuple, Any
 
 # 确保可以导入同一目录下的 pool.py
 import sys

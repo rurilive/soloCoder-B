@@ -39,6 +39,15 @@ app = Flask(__name__)
 # 全局代理池实例
 proxy_pool_instance = None
 
+# 全局白名单缓存
+_whitelist_cache = {
+    "loaded": False,
+    "file_path": None,
+    "enabled": False,
+    "sk_set": set(),  # 存储所有有效的 sk
+    "users": {}  # sk -> user_info 映射
+}
+
 # 默认配置
 DEFAULT_CONFIG = {
     "HOST": "0.0.0.0",
@@ -57,6 +66,9 @@ DEFAULT_CONFIG = {
     
     # API 认证（可选）
     "API_KEY": None,
+    
+    # 白名单认证（可选，优先级高于 API_KEY）
+    "AUTH_WHITELIST_FILE": None,  # 白名单 JSON 文件路径
 }
 
 
@@ -102,6 +114,109 @@ def setup_logging():
     logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
 
+def load_whitelist(file_path: str) -> bool:
+    """
+    从 JSON 文件加载白名单
+    
+    Args:
+        file_path: 白名单 JSON 文件路径
+    
+    Returns:
+        True 如果加载成功
+    """
+    global _whitelist_cache
+    
+    try:
+        if not os.path.exists(file_path):
+            app.logger.warning(f"白名单文件不存在: {file_path}")
+            return False
+        
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        # 解析配置
+        enabled = data.get("enabled", True)
+        authorized_users = data.get("authorized_users", [])
+        
+        # 构建 sk 集合和用户映射
+        sk_set = set()
+        users = {}
+        
+        for user in authorized_users:
+            sk = user.get("sk")
+            if sk and user.get("enabled", True):
+                sk_set.add(sk)
+                users[sk] = {
+                    "name": user.get("name", ""),
+                    "description": user.get("description", ""),
+                }
+        
+        # 更新缓存
+        _whitelist_cache = {
+            "loaded": True,
+            "file_path": file_path,
+            "enabled": enabled,
+            "sk_set": sk_set,
+            "users": users,
+        }
+        
+        app.logger.info(f"白名单加载成功: {file_path}")
+        app.logger.info(f"白名单启用: {enabled}")
+        app.logger.info(f"授权用户数量: {len(sk_set)}")
+        for sk, user in users.items():
+            masked_sk = sk[:8] + "****" + sk[-4:] if len(sk) > 12 else "****"
+            app.logger.info(f"  - {user['name']}: {masked_sk}")
+        
+        return True
+        
+    except json.JSONDecodeError as e:
+        app.logger.error(f"白名单文件 JSON 解析错误: {file_path} - {e}")
+        return False
+    except Exception as e:
+        app.logger.error(f"加载白名单文件失败: {e}")
+        return False
+
+
+def reload_whitelist() -> bool:
+    """
+    重新加载白名单
+    
+    Returns:
+        True 如果重新加载成功
+    """
+    global _whitelist_cache
+    
+    if _whitelist_cache["file_path"]:
+        return load_whitelist(_whitelist_cache["file_path"])
+    return False
+
+
+def is_sk_authorized(sk: str) -> tuple:
+    """
+    检查 sk 是否在白名单中
+    
+    Args:
+        sk: 要检查的密钥
+    
+    Returns:
+        (is_authorized, user_info)
+        - is_authorized: 是否授权
+        - user_info: 用户信息（如果授权）
+    """
+    global _whitelist_cache
+    
+    # 如果白名单未启用，直接返回授权
+    if not _whitelist_cache["loaded"] or not _whitelist_cache["enabled"]:
+        return (True, None)
+    
+    # 检查 sk 是否在白名单中
+    if sk and sk in _whitelist_cache["sk_set"]:
+        user_info = _whitelist_cache["users"].get(sk, {})
+        return (True, user_info)
+    
+    return (False, None)
+
+
 def get_config():
     """获取配置（从环境变量或默认值）"""
     config = DEFAULT_CONFIG.copy()
@@ -120,6 +235,7 @@ def get_config():
         "TIMEOUT": "PROXY_TIMEOUT",
         "POOL_DEBUG": "POOL_DEBUG",
         "API_KEY": "API_KEY",
+        "AUTH_WHITELIST_FILE": "AUTH_WHITELIST_FILE",
     }
     
     for config_key, env_key in env_mappings.items():
@@ -175,21 +291,123 @@ def get_proxy_pool():
     return proxy_pool_instance
 
 
-def check_api_key():
-    """检查 API 密钥（如果配置了）"""
+def get_request_sk() -> Optional[str]:
+    """
+    从请求中获取 SK（Secret Key）
+    
+    支持以下方式传递 SK：
+    1. 请求头: X-API-Key, X-SK, Authorization (Bearer token)
+    2. 查询参数: api_key, sk, token
+    3. 请求体 (JSON): api_key, sk
+    
+    Returns:
+        SK 字符串或 None
+    """
+    # 1. 从请求头获取
+    # X-API-Key: sk-xxx
+    sk = request.headers.get("X-API-Key")
+    if sk:
+        return sk
+    
+    # X-SK: sk-xxx
+    sk = request.headers.get("X-SK")
+    if sk:
+        return sk
+    
+    # Authorization: Bearer sk-xxx
+    auth_header = request.headers.get("Authorization")
+    if auth_header:
+        if auth_header.startswith("Bearer "):
+            return auth_header[7:]  # 去掉 "Bearer " 前缀
+        return auth_header
+    
+    # 2. 从查询参数获取
+    sk = request.args.get("api_key")
+    if sk:
+        return sk
+    
+    sk = request.args.get("sk")
+    if sk:
+        return sk
+    
+    sk = request.args.get("token")
+    if sk:
+        return sk
+    
+    # 3. 从 JSON 请求体获取（尝试解析）
+    try:
+        if request.is_json:
+            data = request.get_json(force=True, silent=True)
+            if data:
+                sk = data.get("api_key")
+                if sk:
+                    return sk
+                sk = data.get("sk")
+                if sk:
+                    return sk
+    except:
+        pass
+    
+    return None
+
+
+def check_authentication() -> tuple:
+    """
+    检查请求认证
+    
+    认证优先级：
+    1. 白名单认证（如果配置了 AUTH_WHITELIST_FILE）
+    2. 单密钥认证（如果配置了 API_KEY）
+    3. 无认证（允许所有请求）
+    
+    Returns:
+        (is_authorized, message, user_info)
+    """
+    global _whitelist_cache
     config = get_config()
+    
+    # 从请求中获取 SK
+    request_sk = get_request_sk()
+    
+    # 记录访问日志（脱敏）
+    if request_sk:
+        masked_sk = request_sk[:4] + "****" + request_sk[-4:] if len(request_sk) > 8 else "****"
+        app.logger.debug(f"认证请求 - SK: {masked_sk}, 路径: {request.path}")
+    else:
+        app.logger.debug(f"认证请求 - 无 SK, 路径: {request.path}")
+    
+    # 1. 检查是否配置了白名单认证
+    whitelist_file = config.get("AUTH_WHITELIST_FILE")
+    if whitelist_file:
+        # 如果白名单还未加载，尝试加载
+        if not _whitelist_cache["loaded"]:
+            load_whitelist(whitelist_file)
+        
+        # 如果白名单已启用
+        if _whitelist_cache["enabled"]:
+            if not request_sk:
+                return (False, "未授权：缺少认证密钥 (SK)", None)
+            
+            is_authorized, user_info = is_sk_authorized(request_sk)
+            
+            if is_authorized:
+                return (True, "认证通过", user_info)
+            else:
+                return (False, "未授权：密钥不在白名单中", None)
+    
+    # 2. 检查是否配置了单密钥认证
     api_key = config.get("API_KEY")
+    if api_key is not None:
+        if request_sk == api_key:
+            return (True, "认证通过", None)
+        else:
+            if not request_sk:
+                return (False, "未授权：缺少认证密钥", None)
+            else:
+                return (False, "未授权：密钥无效", None)
     
-    if api_key is None:
-        return True  # 没有配置 API 密钥，允许访问
-    
-    # 从请求头或查询参数获取 API 密钥
-    request_key = request.headers.get("X-API-Key") or request.args.get("api_key")
-    
-    if request_key != api_key:
-        return False
-    
-    return True
+    # 3. 无认证配置，允许所有请求
+    return (True, "无认证", None)
 
 
 def api_response(success: bool, data=None, message: str = None, code: int = 200):
@@ -216,13 +434,20 @@ def before_request():
     """请求前处理"""
     g.start_time = datetime.now()
     
-    # 检查 API 密钥
-    if not check_api_key():
+    # 检查认证
+    is_authorized, message, user_info = check_authentication()
+    
+    if not is_authorized:
+        app.logger.warning(f"认证失败 - IP: {request.remote_addr}, 路径: {request.path}, 原因: {message}")
         return api_response(
             success=False,
-            message="Invalid or missing API key",
+            message=message,
             code=401
         )
+    
+    # 将用户信息保存到 g 对象，供后续使用
+    g.user_info = user_info
+    g.auth_message = message
 
 
 @app.after_request

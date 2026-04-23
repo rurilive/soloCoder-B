@@ -1,0 +1,20 @@
+{
+  "enabled": true,
+  "description": "代理池 API 白名单认证配置",
+  "authorized_users": [
+    {
+      "sk": "sk-proxy-2024-user001",
+      "name": "默认用户",
+      "description": "默认授权用户，可用于测试",
+      "enabled": true,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "sk": "sk-proxy-2024-admin001",
+      "name": "管理员",
+      "description": "管理员账号，拥有完整权限",
+      "enabled": true,
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  ]
+}

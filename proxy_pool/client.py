@@ -7,11 +7,17 @@
 使用示例:
     from proxy_pool.client import ProxyPoolClient
     
-    # 创建客户端
+    # 创建客户端（无认证）
+    client = ProxyPoolClient(
+        host="localhost",
+        port=5010
+    )
+    
+    # 或使用白名单认证（SK）
     client = ProxyPoolClient(
         host="localhost",
         port=5010,
-        api_key=None  # 可选的 API 密钥
+        sk="sk-proxy-2024-user001"  # 从白名单配置文件获取
     )
     
     # 获取代理
@@ -25,7 +31,7 @@
             # 汇报有效
             client.report_proxy(proxy, is_valid=True)
         except Exception as e:
-            # 汇报无效（代理将被自动删除）
+            # 汇报无效（代理将被自动从服务器删除）
             client.report_proxy(proxy, is_valid=False, reason=str(e))
 """
 
@@ -41,6 +47,7 @@ class ProxyPoolClient:
                  host: str = "localhost",
                  port: int = 5010,
                  scheme: str = "http",
+                 sk: str = None,
                  api_key: str = None,
                  timeout: int = 10,
                  max_retries: int = 3):
@@ -51,12 +58,13 @@ class ProxyPoolClient:
             host: 代理池服务器地址
             port: 代理池服务器端口
             scheme: URL 协议 (http/https)
-            api_key: 可选的 API 密钥
+            sk: 认证密钥（Secret Key，用于白名单认证）
+            api_key: 旧参数名，与 sk 相同（兼容旧代码）
             timeout: 请求超时时间（秒）
             max_retries: 最大重试次数
         """
         self.base_url = f"{scheme}://{host}:{port}"
-        self.api_key = api_key
+        self.sk = sk or api_key  # 支持两种参数名
         self.timeout = timeout
         self.max_retries = max_retries
         
@@ -66,9 +74,9 @@ class ProxyPoolClient:
             "User-Agent": "ProxyPool-Client/1.0"
         }
         
-        # 如果有 API 密钥，添加到请求头
-        if api_key:
-            self._headers["X-API-Key"] = api_key
+        # 如果有认证密钥，添加到请求头（使用 X-API-Key 头，服务器支持多种方式）
+        if self.sk:
+            self._headers["X-API-Key"] = self.sk
     
     def _build_url(self, endpoint: str) -> str:
         """构建完整 URL"""

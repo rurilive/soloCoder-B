@@ -4,23 +4,23 @@
 代理池 API 服务器启动脚本
 
 使用方式:
-    # 默认启动（0.0.0.0:5010）
+    # 默认启动（0.0.0.0:5010，无认证）
     python start_proxy_pool.py
+    
+    # 使用白名单认证（从 JSON 文件读取授权 SK）
+    python start_proxy_pool.py --auth-whitelist proxy_auth.json
+    
+    # 或使用环境变量
+    AUTH_WHITELIST_FILE=proxy_auth.json python start_proxy_pool.py
     
     # 指定端口
     python start_proxy_pool.py --port 8080
     
-    # 指定主机
-    python start_proxy_pool.py --host 127.0.0.1
-    
     # 启用调试模式
     python start_proxy_pool.py --debug
     
-    # 使用环境变量配置
-    PROXY_HOST=127.0.0.1 PROXY_PORT=8080 PROXY_DEBUG=true python start_proxy_pool.py
-    
-    # 启用 API Key 认证
-    API_KEY=my_secret_key python start_proxy_pool.py
+    # 使用单密钥认证（旧方式，白名单优先级更高）
+    python start_proxy_pool.py --api-key my_secret_key
 """
 
 import os
@@ -35,19 +35,30 @@ def parse_args():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
 示例:
-  %(prog)s                      # 默认启动 0.0.0.0:5010
-  %(prog)s --port 8080          # 指定端口
-  %(prog)s --host 127.0.0.1     # 只监听本地
-  %(prog)s --debug               # 调试模式
-  %(prog)s --api-key secret123   # 启用 API Key 认证
+  %(prog)s                              # 默认启动，无认证
+  %(prog)s --auth-whitelist proxy_auth.json  # 使用白名单认证
+  %(prog)s --port 8080                  # 指定端口
+  %(prog)s --host 127.0.0.1             # 只监听本地
+  %(prog)s --debug                       # 调试模式
+
+认证方式 (优先级: 白名单 > 单密钥 > 无认证):
+  1. 白名单认证: 从 JSON 文件读取多个授权 SK
+     --auth-whitelist proxy_auth.json
+     
+  2. 单密钥认证: 所有请求使用同一个密钥
+     --api-key my_secret_key
+     
+  3. 无认证: 所有请求都允许 (默认)
 
 环境变量:
-  PROXY_HOST      - 监听地址 (默认: 0.0.0.0)
-  PROXY_PORT      - 监听端口 (默认: 5010)
-  PROXY_DEBUG     - 调试模式 (true/false, 默认: false)
-  LOG_LEVEL       - 日志级别 (DEBUG/INFO/WARNING/ERROR, 默认: INFO)
-  LOG_FILE        - 日志文件路径 (默认: proxy_pool.log)
-  API_KEY         - API 认证密钥 (可选，不设置则不启用认证)
+  PROXY_HOST              - 监听地址 (默认: 0.0.0.0)
+  PROXY_PORT              - 监听端口 (默认: 5010)
+  PROXY_DEBUG             - 调试模式 (true/false, 默认: false)
+  LOG_LEVEL               - 日志级别 (DEBUG/INFO/WARNING/ERROR, 默认: INFO)
+  LOG_FILE                - 日志文件路径 (默认: proxy_pool.log)
+  
+  AUTH_WHITELIST_FILE     - 白名单 JSON 文件路径 (优先级最高)
+  API_KEY                 - 单密钥认证
   
   MAX_PROXIES              - 最大代理数量 (默认: 30)
   VALIDATION_INTERVAL      - 验证间隔秒 (默认: 60)
@@ -79,9 +90,15 @@ def parse_args():
     )
     
     parser.add_argument(
+        '--auth-whitelist',
+        default=os.getenv('AUTH_WHITELIST_FILE'),
+        help='白名单 JSON 文件路径 (优先级高于 --api-key)'
+    )
+    
+    parser.add_argument(
         '--api-key',
         default=os.getenv('API_KEY'),
-        help='API 认证密钥 (不设置则不启用认证)'
+        help='单密钥认证 (白名单未配置时使用)'
     )
     
     parser.add_argument(
@@ -104,12 +121,26 @@ def main():
     """主函数"""
     args = parse_args()
     
+    # 确定认证模式
+    auth_mode = "无认证"
+    auth_details = ""
+    
+    if args.auth_whitelist:
+        auth_mode = "白名单认证"
+        auth_details = f"白名单文件: {args.auth_whitelist}"
+    elif args.api_key:
+        auth_mode = "单密钥认证"
+        auth_details = "API Key: 已配置"
+    
     # 设置环境变量（供 server.py 使用）
     os.environ['PROXY_HOST'] = args.host
     os.environ['PROXY_PORT'] = str(args.port)
     os.environ['PROXY_DEBUG'] = 'true' if args.debug else 'false'
     os.environ['LOG_LEVEL'] = args.log_level
     os.environ['LOG_FILE'] = args.log_file
+    
+    if args.auth_whitelist:
+        os.environ['AUTH_WHITELIST_FILE'] = args.auth_whitelist
     
     if args.api_key:
         os.environ['API_KEY'] = args.api_key
@@ -120,7 +151,9 @@ def main():
     print("=" * 70)
     print(f"  监听地址: {args.host}:{args.port}")
     print(f"  调试模式: {'启用' if args.debug else '禁用'}")
-    print(f"  API 认证: {'启用' if args.api_key else '禁用'}")
+    print(f"  认证模式: {auth_mode}")
+    if auth_details:
+        print(f"  {auth_details}")
     print(f"  日志级别: {args.log_level}")
     print(f"  日志文件: {args.log_file}")
     print("=" * 70)
@@ -150,11 +183,31 @@ def main():
     print(f"       -d '{{\"proxy_str\": \"1.2.3.4:8080\", \"is_valid\": false, \"reason\": \"timeout\"}}'")
     print()
     
-    if args.api_key:
-        print("注意: 已启用 API Key 认证，请求需包含 X-API-Key 头或 api_key 参数")
+    if args.auth_whitelist:
+        print("注意: 已启用白名单认证，请求需包含有效的 SK（Secret Key）")
+        print("SK 传递方式 (任选其一):")
+        print("  1. 请求头: X-API-Key, X-SK, Authorization (Bearer token)")
+        print("  2. 查询参数: api_key, sk, token")
+        print("  3. JSON 请求体: api_key, sk")
+        print()
         print("示例:")
-        print(f"  curl -H \"X-API-Key: {args.api_key}\" http://{args.host}:{args.port}/api/proxy")
-        print(f"  curl http://{args.host}:{args.port}/api/proxy?api_key={args.api_key}")
+        print(f'  curl -H "X-API-Key: sk-proxy-xxx" http://{args.host}:{args.port}/api/proxy')
+        print(f'  curl -H "X-SK: sk-proxy-xxx" http://{args.host}:{args.port}/api/proxy')
+        print(f'  curl -H "Authorization: Bearer sk-proxy-xxx" http://{args.host}:{args.port}/api/proxy')
+        print(f'  curl http://{args.host}:{args.port}/api/proxy?sk=sk-proxy-xxx')
+        print()
+        print("请在白名单配置文件中查看有效的 SK")
+        print()
+    elif args.api_key:
+        print("注意: 已启用单密钥认证，请求需包含 API Key")
+        print("API Key 传递方式 (任选其一):")
+        print("  1. 请求头: X-API-Key, X-SK, Authorization (Bearer token)")
+        print("  2. 查询参数: api_key, sk, token")
+        print("  3. JSON 请求体: api_key, sk")
+        print()
+        print("示例:")
+        print(f'  curl -H "X-API-Key: {args.api_key}" http://{args.host}:{args.port}/api/proxy')
+        print(f'  curl http://{args.host}:{args.port}/api/proxy?api_key={args.api_key}')
         print()
     
     print("=" * 70)

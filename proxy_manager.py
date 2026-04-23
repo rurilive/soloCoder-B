@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-免费代理池管理器（增强版）
-- 支持多种代理源
-- 详细的调试输出
-- 改进的代理验证逻辑
-- 支持HTTP和HTTPS代理
+高级代理池管理器
+- 后台线程定期验证代理可用性
+- 线程安全的代理获取机制
+- 不允许连续返回相同代理
+- 相同代理返回间隔5秒以上
+- 自动从多个源获取新代理
 """
 
 import requests
 import random
 import time
 import re
+import threading
 from typing import List, Dict, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
 
 try:
     from bs4 import BeautifulSoup
@@ -21,59 +24,83 @@ try:
 except ImportError:
     HAS_BS4 = False
     print("警告: 未安装 beautifulsoup4，某些代理源可能无法正确解析")
-    print("建议安装: pip install beautifulsoup4")
 
 
-class ProxyManager:
-    """代理池管理器（增强版）"""
+class AdvancedProxyPool:
+    """高级代理池管理器"""
     
-    def __init__(self, max_proxies: int = 20, timeout: int = 10, debug: bool = True):
+    def __init__(self, 
+                 max_proxies: int = 30,
+                 validation_interval: int = 60,
+                 refresh_interval: int = 300,
+                 proxy_return_interval: float = 5.0,
+                 timeout: int = 10,
+                 debug: bool = True):
         """
-        初始化代理管理器
+        初始化高级代理池
         
         Args:
             max_proxies: 最大代理数量
+            validation_interval: 验证间隔（秒）
+            refresh_interval: 刷新代理间隔（秒）
+            proxy_return_interval: 相同代理返回间隔（秒）
             timeout: 代理验证超时时间
             debug: 是否开启调试模式
         """
         self.max_proxies = max_proxies
+        self.validation_interval = validation_interval
+        self.refresh_interval = refresh_interval
+        self.proxy_return_interval = proxy_return_interval
         self.timeout = timeout
         self.debug = debug
-        self.proxies: List[Dict] = []
-        self.current_index = 0
         
-        # 增强的请求头
+        # 代理存储
+        self._proxies: List[Dict] = []
+        
+        # 代理使用记录
+        self._last_used: Dict[str, float] = {}  # proxy_str -> last_used_time
+        self._last_returned: Optional[str] = None  # 上一次返回的代理
+        
+        # 线程安全
+        self._lock = threading.Lock()
+        self._stop_event = threading.Event()
+        
+        # 后台线程
+        self._validator_thread: Optional[threading.Thread] = None
+        self._refresh_thread: Optional[threading.Thread] = None
+        
+        # 请求头
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
             "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-            "Accept-Encoding": "gzip, deflate",
-            "Connection": "keep-alive",
         }
         
-        # 测试URL列表（包含http和https）
+        # 测试URL
         self.test_urls = [
             ("http://www.baidu.com", "http"),
             ("http://httpbin.org/ip", "http"),
-            ("https://www.baidu.com", "https"),
         ]
+        
+        # 统计信息
+        self._stats = {
+            "total_requests": 0,
+            "successful_requests": 0,
+            "failed_requests": 0,
+            "proxies_refreshed": 0,
+            "proxies_validated": 0,
+        }
     
     def _debug_print(self, msg: str) -> None:
         """调试打印"""
         if self.debug:
-            print(f"  [调试] {msg}")
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            print(f"[{timestamp}] [代理池] {msg}")
+    
+    # ==================== 代理获取和解析 ====================
     
     def _get_page_content(self, url: str, headers: Dict = None) -> Tuple[bool, str]:
-        """
-        获取页面内容
-        
-        Args:
-            url: 目标URL
-            headers: 请求头
-            
-        Returns:
-            (是否成功, 页面内容或错误信息)
-        """
+        """获取页面内容"""
         try:
             response = requests.get(
                 url,
@@ -83,24 +110,29 @@ class ProxyManager:
             )
             response.encoding = 'utf-8'
             return True, response.text
-        except requests.exceptions.Timeout:
-            return False, "请求超时"
-        except requests.exceptions.ConnectionError as e:
-            return False, f"连接错误: {e}"
         except Exception as e:
-            return False, f"未知错误: {e}"
+            return False, str(e)
+    
+    def _is_valid_ip_port(self, ip: str, port: str) -> bool:
+        """验证IP和端口是否有效"""
+        if not ip or not port:
+            return False
+        
+        ip_pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
+        if not re.match(ip_pattern, ip.strip()):
+            return False
+        
+        try:
+            port_num = int(port.strip())
+            if not (0 < port_num <= 65535):
+                return False
+        except ValueError:
+            return False
+        
+        return True
     
     def _parse_with_regex(self, html: str, patterns: List[str]) -> List[str]:
-        """
-        使用正则表达式解析代理
-        
-        Args:
-            html: HTML内容
-            patterns: 正则表达式列表
-            
-        Returns:
-            代理列表 (ip:port)
-        """
+        """使用正则解析代理"""
         proxies = []
         for pattern in patterns:
             matches = re.findall(pattern, html, re.MULTILINE | re.DOTALL)
@@ -111,29 +143,18 @@ class ProxyManager:
                     continue
                 
                 if self._is_valid_ip_port(ip, port):
-                    proxy_str = f"{ip}:{port}"
-                    proxies.append(proxy_str)
+                    proxies.append(f"{ip}:{port}")
         
         return list(set(proxies))
     
     def _parse_with_bs4(self, html: str) -> List[str]:
-        """
-        使用BeautifulSoup解析代理
-        
-        Args:
-            html: HTML内容
-            
-        Returns:
-            代理列表 (ip:port)
-        """
+        """使用BeautifulSoup解析代理"""
         if not HAS_BS4:
             return []
         
         proxies = []
         try:
             soup = BeautifulSoup(html, 'html.parser')
-            
-            # 查找所有包含IP和端口的表格行
             rows = soup.find_all('tr')
             for row in rows:
                 cells = row.find_all(['td', 'th'])
@@ -142,48 +163,15 @@ class ProxyManager:
                     port_text = cells[1].get_text(strip=True)
                     
                     if self._is_valid_ip_port(ip_text, port_text):
-                        proxy_str = f"{ip_text}:{port_text}"
-                        proxies.append(proxy_str)
-        except Exception as e:
-            self._debug_print(f"BeautifulSoup解析错误: {e}")
+                        proxies.append(f"{ip_text}:{port_text}")
+        except Exception:
+            pass
         
         return list(set(proxies))
     
-    def _is_valid_ip_port(self, ip: str, port: str) -> bool:
-        """
-        验证IP和端口是否有效
-        
-        Args:
-            ip: IP地址
-            port: 端口号
-            
-        Returns:
-            是否有效
-        """
-        if not ip or not port:
-            return False
-        
-        # 验证IP格式
-        ip_pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
-        if not re.match(ip_pattern, ip.strip()):
-            return False
-        
-        # 验证端口
-        try:
-            port_num = int(port.strip())
-            if not (0 < port_num <= 65535):
-                return False
-        except ValueError:
-            return False
-        
-        return True
-    
     def _get_from_kuaidaili(self) -> List[str]:
-        """从快代理获取免费代理"""
+        """从快代理获取"""
         proxies = []
-        self._debug_print("尝试从快代理获取...")
-        
-        # 尝试多个URL
         urls = [
             "https://www.kuaidaili.com/free/inha/1/",
             "https://www.kuaidaili.com/free/intr/1/",
@@ -191,199 +179,70 @@ class ProxyManager:
         
         for url in urls:
             success, content = self._get_page_content(url)
-            
             if success:
-                self._debug_print(f"快代理页面获取成功，长度: {len(content)} 字符")
-                
-                # 尝试多种正则模式
                 patterns = [
                     r'<td[^>]*data-title="IP"[^>]*>([\d.]+)</td>\s*<td[^>]*data-title="PORT"[^>]*>(\d+)</td>',
                     r'<td[^>]*>\s*([\d.]+)\s*</td>\s*<td[^>]*>\s*(\d+)\s*</td>',
-                    r'([\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3})\s*[\s:：]\s*(\d{2,5})',
                 ]
-                
-                # 使用正则解析
                 regex_proxies = self._parse_with_regex(content, patterns)
-                self._debug_print(f"正则解析到 {len(regex_proxies)} 个代理")
-                
-                # 使用BeautifulSoup解析
                 bs4_proxies = self._parse_with_bs4(content)
-                self._debug_print(f"BS4解析到 {len(bs4_proxies)} 个代理")
-                
-                # 合并结果
                 all_proxies = list(set(regex_proxies + bs4_proxies))
                 proxies.extend(all_proxies)
-                
                 if len(all_proxies) > 0:
-                    self._debug_print(f"从快代理共获取到 {len(all_proxies)} 个代理")
                     break
-            else:
-                self._debug_print(f"快代理获取失败: {content}")
         
         return list(set(proxies))
     
     def _get_from_89ip(self) -> List[str]:
-        """从89代理获取免费代理"""
+        """从89代理获取"""
         proxies = []
-        self._debug_print("尝试从89代理获取...")
-        
-        urls = [
-            "https://www.89ip.cn/",
-            "https://www.89ip.cn/index_1.html",
-        ]
+        urls = ["https://www.89ip.cn/", "https://www.89ip.cn/index_1.html"]
         
         for url in urls:
             success, content = self._get_page_content(url)
-            
             if success:
-                self._debug_print(f"89代理页面获取成功，长度: {len(content)} 字符")
-                
                 patterns = [
                     r'<td[^>]*>\s*([\d.]+)\s*</td>\s*<td[^>]*>\s*(\d+)\s*</td>',
-                    r'([\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3})\s*[\s:：]\s*(\d{2,5})',
                 ]
-                
                 regex_proxies = self._parse_with_regex(content, patterns)
                 bs4_proxies = self._parse_with_bs4(content)
-                
                 all_proxies = list(set(regex_proxies + bs4_proxies))
                 proxies.extend(all_proxies)
-                
                 if len(all_proxies) > 0:
-                    self._debug_print(f"从89代理共获取到 {len(all_proxies)} 个代理")
                     break
-            else:
-                self._debug_print(f"89代理获取失败: {content}")
         
         return list(set(proxies))
     
-    def _get_from_jiangxianli(self) -> List[str]:
-        """从站大爷获取免费代理"""
+    def _get_from_proxy_api(self) -> List[str]:
+        """从代理API获取"""
         proxies = []
-        self._debug_print("尝试从站大爷获取...")
-        
-        urls = [
-            "https://ip.jiangxianli.com/",
-            "https://ip.jiangxianli.com/?page=1",
-        ]
-        
-        for url in urls:
-            success, content = self._get_page_content(url)
-            
-            if success:
-                self._debug_print(f"站大爷页面获取成功，长度: {len(content)} 字符")
-                
-                patterns = [
-                    r'<td[^>]*>\s*([\d.]+)\s*</td>\s*<td[^>]*>\s*(\d+)\s*</td>',
-                    r'([\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3})\s*[\s:：]\s*(\d{2,5})',
-                    r'>([\d.]+):(\d+)<',
-                ]
-                
-                regex_proxies = self._parse_with_regex(content, patterns)
-                bs4_proxies = self._parse_with_bs4(content)
-                
-                all_proxies = list(set(regex_proxies + bs4_proxies))
-                proxies.extend(all_proxies)
-                
-                if len(all_proxies) > 0:
-                    self._debug_print(f"从站大爷共获取到 {len(all_proxies)} 个代理")
-                    break
-            else:
-                self._debug_print(f"站大爷获取失败: {content}")
-        
-        return list(set(proxies))
-    
-    def _get_from_ihuan(self) -> List[str]:
-        """从幻代理获取免费代理"""
-        proxies = []
-        self._debug_print("尝试从幻代理获取...")
-        
-        urls = [
-            "https://ip.ihuan.me/",
-            "https://ip.ihuan.me/ti.html",
-        ]
-        
-        for url in urls:
-            success, content = self._get_page_content(url)
-            
-            if success:
-                self._debug_print(f"幻代理页面获取成功，长度: {len(content)} 字符")
-                
-                patterns = [
-                    r'([\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3})\s*[\s:：]\s*(\d{2,5})',
-                    r'>([\d.]+):(\d+)<',
-                    r'([\d.]+)\s*[:：]\s*(\d+)',
-                ]
-                
-                regex_proxies = self._parse_with_regex(content, patterns)
-                bs4_proxies = self._parse_with_bs4(content)
-                
-                all_proxies = list(set(regex_proxies + bs4_proxies))
-                proxies.extend(all_proxies)
-                
-                if len(all_proxies) > 0:
-                    self._debug_print(f"从幻代理共获取到 {len(all_proxies)} 个代理")
-                    break
-            else:
-                self._debug_print(f"幻代理获取失败: {content}")
-        
-        return list(set(proxies))
-    
-    def _get_from_proxy_list(self) -> List[str]:
-        """从代理列表API获取"""
-        proxies = []
-        self._debug_print("尝试从代理列表API获取...")
-        
-        # 一些公开的代理API
         api_urls = [
             "https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=10000&country=all&ssl=all&anonymity=all",
-            "https://www.proxy-list.download/api/v1/get?type=http",
         ]
         
         for url in api_urls:
             success, content = self._get_page_content(url)
-            
             if success:
-                self._debug_print(f"代理API获取成功，长度: {len(content)} 字符")
-                
-                # 解析每行的代理
                 lines = content.strip().split('\n')
                 for line in lines:
                     line = line.strip()
                     if ':' in line:
                         parts = line.split(':')
-                        if len(parts) == 2:
-                            ip, port = parts
-                            if self._is_valid_ip_port(ip, port):
-                                proxies.append(f"{ip}:{port}")
-                
+                        if len(parts) == 2 and self._is_valid_ip_port(parts[0], parts[1]):
+                            proxies.append(line)
                 if len(proxies) > 0:
-                    self._debug_print(f"从代理API共获取到 {len(proxies)} 个代理")
                     break
-            else:
-                self._debug_print(f"代理API获取失败: {content}")
         
         return list(set(proxies))
     
-    def _validate_proxy(self, proxy_str: str) -> Optional[Dict]:
-        """
-        验证代理是否可用（增强版）
-        
-        Args:
-            proxy_str: 代理字符串，格式为 "ip:port"
-            
-        Returns:
-            可用的代理字典，否则返回None
-        """
-        self._debug_print(f"正在验证代理: {proxy_str}")
-        
-        # 分别测试http和https代理
-        test_results = []
-        
+    # ==================== 代理验证 ====================
+    
+    def _validate_single_proxy(self, proxy_str: str) -> Optional[Dict]:
+        """验证单个代理"""
         for test_url, protocol in self.test_urls:
             proxy_config = {
                 "http": f"http://{proxy_str}",
-                "https": f"http://{proxy_str}"  # 大多数免费代理只支持HTTP协议
+                "https": f"http://{proxy_str}"
             }
             
             try:
@@ -397,195 +256,379 @@ class ProxyManager:
                 )
                 elapsed = time.time() - start_time
                 
-                # 检查状态码
                 if response.status_code in [200, 301, 302, 304]:
-                    result = {
+                    return {
                         "proxy_str": proxy_str,
                         "proxy": proxy_config,
                         "response_time": elapsed,
-                        "protocol": protocol,
-                        "status_code": response.status_code
+                        "last_validated": time.time(),
+                        "success_count": 1,
+                        "fail_count": 0,
                     }
-                    test_results.append(result)
-                    self._debug_print(f"  ✅ {protocol} 验证成功 (状态码: {response.status_code}, 耗时: {elapsed:.2f}s)")
-                    
-                    # 如果HTTP验证成功，立即返回
-                    if protocol == "http":
-                        return result
-                        
-            except requests.exceptions.ProxyError as e:
-                self._debug_print(f"  ❌ {protocol} 代理错误: {str(e)[:50]}")
-            except requests.exceptions.Timeout:
-                self._debug_print(f"  ❌ {protocol} 超时 ({self.timeout}s)")
-            except requests.exceptions.ConnectionError as e:
-                self._debug_print(f"  ❌ {protocol} 连接错误: {str(e)[:50]}")
-            except Exception as e:
-                self._debug_print(f"  ❌ {protocol} 其他错误: {str(e)[:50]}")
-        
-        # 如果有任何验证成功，返回最快的那个
-        if test_results:
-            test_results.sort(key=lambda x: x["response_time"])
-            return test_results[0]
+            except Exception:
+                pass
         
         return None
     
-    def fetch_proxies(self) -> int:
-        """
-        从所有源获取代理并验证
-        
-        Returns:
-            获取到的可用代理数量
-        """
-        print("\n" + "="*70)
-        print("开始获取免费代理...")
-        print("="*70)
-        
-        # 代理源列表
-        proxy_sources = [
-            ("快代理", self._get_from_kuaidaili),
-            ("89代理", self._get_from_89ip),
-            ("站大爷", self._get_from_jiangxianli),
-            ("幻代理", self._get_from_ihuan),
-            ("代理API", self._get_from_proxy_list),
-        ]
-        
-        all_proxies = set()
-        
-        # 从所有源获取代理
-        print("\n[步骤1] 从各个代理源获取代理...")
-        for source_name, source_func in proxy_sources:
-            print(f"\n正在从 {source_name} 获取...")
-            try:
-                proxies = source_func()
-                for p in proxies:
-                    all_proxies.add(p)
-                print(f"✅ 从 {source_name} 获取到 {len(proxies)} 个代理")
-            except Exception as e:
-                print(f"❌ 从 {source_name} 获取代理失败: {e}")
-        
-        print(f"\n[步骤1完成] 总共获取到 {len(all_proxies)} 个代理")
-        
-        if len(all_proxies) == 0:
-            print("\n❌ 没有获取到任何代理，请检查网络连接或稍后再试")
-            return 0
-        
-        print(f"\n[步骤2] 开始验证代理可用性 (超时: {self.timeout}s)...")
-        
-        # 并发验证代理
+    def _validate_proxies_batch(self, proxy_list: List[str], max_workers: int = 10) -> List[Dict]:
+        """批量验证代理"""
         valid_proxies = []
-        proxy_list = list(all_proxies)
-        
-        # 使用更多的线程来验证
-        max_workers = min(20, len(proxy_list))
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_proxy = {
-                executor.submit(self._validate_proxy, proxy_str): proxy_str 
+                executor.submit(self._validate_single_proxy, proxy_str): proxy_str
                 for proxy_str in proxy_list
             }
             
-            completed = 0
             for future in as_completed(future_to_proxy):
-                completed += 1
-                if completed % 10 == 0:
-                    print(f"  验证进度: {completed}/{len(proxy_list)}, 已找到 {len(valid_proxies)} 个可用代理")
-                
                 try:
                     result = future.result()
                     if result:
                         valid_proxies.append(result)
-                        # 找到足够的代理就提前结束
-                        if len(valid_proxies) >= self.max_proxies:
-                            print(f"\n  已找到足够的代理 ({self.max_proxies}个)，提前结束验证")
-                            break
-                except Exception as e:
+                except Exception:
                     pass
         
         # 按响应时间排序
         valid_proxies.sort(key=lambda x: x["response_time"])
-        self.proxies = valid_proxies
-        self.current_index = 0
+        return valid_proxies
+    
+    # ==================== 后台线程任务 ====================
+    
+    def _refresh_proxies_task(self) -> None:
+        """刷新代理任务（后台线程）"""
+        while not self._stop_event.is_set():
+            self._debug_print("开始从各代理源获取新代理...")
+            
+            # 从所有源获取代理
+            all_proxies = set()
+            
+            sources = [
+                ("快代理", self._get_from_kuaidaili),
+                ("89代理", self._get_from_89ip),
+                ("代理API", self._get_from_proxy_api),
+            ]
+            
+            for source_name, source_func in sources:
+                try:
+                    proxies = source_func()
+                    for p in proxies:
+                        all_proxies.add(p)
+                    self._debug_print(f"从 {source_name} 获取到 {len(proxies)} 个代理")
+                except Exception as e:
+                    self._debug_print(f"从 {source_name} 获取失败: {e}")
+            
+            self._debug_print(f"总共获取到 {len(all_proxies)} 个代理，开始验证...")
+            
+            # 验证新获取的代理
+            new_valid_proxies = self._validate_proxies_batch(list(all_proxies))
+            
+            with self._lock:
+                # 合并现有代理和新代理
+                existing_proxy_strs = {p["proxy_str"] for p in self._proxies}
+                
+                for proxy in new_valid_proxies:
+                    if proxy["proxy_str"] not in existing_proxy_strs:
+                        self._proxies.append(proxy)
+                        # 初始化使用记录
+                        if proxy["proxy_str"] not in self._last_used:
+                            self._last_used[proxy["proxy_str"]] = 0
+                
+                # 限制最大数量
+                if len(self._proxies) > self.max_proxies:
+                    self._proxies.sort(key=lambda x: x["response_time"])
+                    self._proxies = self._proxies[:self.max_proxies]
+                
+                self._stats["proxies_refreshed"] += len(new_valid_proxies)
+            
+            self._debug_print(f"刷新完成！当前可用代理: {len(self._proxies)} 个")
+            
+            # 等待下一次刷新
+            self._stop_event.wait(self.refresh_interval)
+    
+    def _validate_existing_proxies_task(self) -> None:
+        """验证现有代理任务（后台线程）"""
+        while not self._stop_event.is_set():
+            # 等待验证间隔
+            self._stop_event.wait(self.validation_interval)
+            
+            if self._stop_event.is_set():
+                break
+            
+            with self._lock:
+                if not self._proxies:
+                    self._debug_print("没有代理需要验证")
+                    continue
+                
+                proxy_list = [p["proxy_str"] for p in self._proxies]
+                self._debug_print(f"开始验证现有 {len(proxy_list)} 个代理...")
+            
+            # 验证代理（不在锁内执行，避免阻塞）
+            validation_results = {}
+            for proxy_str in proxy_list:
+                result = self._validate_single_proxy(proxy_str)
+                validation_results[proxy_str] = result is not None
+            
+            # 更新代理状态
+            with self._lock:
+                new_proxies = []
+                for proxy in self._proxies:
+                    proxy_str = proxy["proxy_str"]
+                    is_valid = validation_results.get(proxy_str, False)
+                    
+                    if is_valid:
+                        proxy["last_validated"] = time.time()
+                        proxy["success_count"] = proxy.get("success_count", 0) + 1
+                        new_proxies.append(proxy)
+                    else:
+                        proxy["fail_count"] = proxy.get("fail_count", 0) + 1
+                        # 失败次数超过3次则移除
+                        if proxy["fail_count"] < 3:
+                            new_proxies.append(proxy)
+                
+                removed_count = len(self._proxies) - len(new_proxies)
+                self._proxies = new_proxies
+                self._stats["proxies_validated"] += len(proxy_list)
+                
+                if removed_count > 0:
+                    self._debug_print(f"移除了 {removed_count} 个不可用代理")
+                self._debug_print(f"验证完成！剩余可用代理: {len(self._proxies)} 个")
+    
+    # ==================== 公共接口 ====================
+    
+    def start(self) -> None:
+        """启动代理池后台线程"""
+        if self._validator_thread and self._validator_thread.is_alive():
+            self._debug_print("代理池已经在运行中")
+            return
         
-        print("\n" + "="*70)
-        print("代理验证完成！")
-        print("="*70)
-        print(f"总体验证代理数: {len(proxy_list)}")
-        print(f"可用代理数: {len(self.proxies)}")
+        self._stop_event.clear()
         
-        if len(self.proxies) > 0:
-            print(f"\n最快的 {min(5, len(self.proxies))} 个代理:")
-            for i, p in enumerate(self.proxies[:5]):
-                print(f"  {i+1}. {p['proxy_str']} - 响应时间: {p['response_time']:.2f}s, 协议: {p.get('protocol', 'http')}")
+        # 先同步获取一次代理
+        self._debug_print("初始化代理池...")
+        self._debug_print("先从各源获取代理...")
+        
+        # 同步获取初始代理
+        all_proxies = set()
+        sources = [
+            ("快代理", self._get_from_kuaidaili),
+            ("89代理", self._get_from_89ip),
+            ("代理API", self._get_from_proxy_api),
+        ]
+        
+        for source_name, source_func in sources:
+            try:
+                proxies = source_func()
+                for p in proxies:
+                    all_proxies.add(p)
+                self._debug_print(f"从 {source_name} 获取到 {len(proxies)} 个代理")
+            except Exception as e:
+                self._debug_print(f"从 {source_name} 获取失败: {e}")
+        
+        # 验证初始代理
+        if all_proxies:
+            self._debug_print(f"验证 {len(all_proxies)} 个代理...")
+            valid_proxies = self._validate_proxies_batch(list(all_proxies))
+            
+            with self._lock:
+                self._proxies = valid_proxies
+                for proxy in valid_proxies:
+                    self._last_used[proxy["proxy_str"]] = 0
+            
+            self._debug_print(f"初始化完成！可用代理: {len(self._proxies)} 个")
         else:
-            print("\n❌ 没有找到可用的免费代理")
-            print("建议:")
-            print("  1. 尝试不使用代理模式运行: python leetcode_crawler.py --no-proxy")
-            print("  2. 稍后再试（免费代理可用性波动较大）")
-            print("  3. 使用付费代理服务")
+            self._debug_print("警告: 初始获取代理失败，后台线程将继续尝试")
         
-        return len(self.proxies)
+        # 启动后台线程
+        self._refresh_thread = threading.Thread(
+            target=self._refresh_proxies_task,
+            daemon=True,
+            name="ProxyRefreshThread"
+        )
+        self._refresh_thread.start()
+        
+        self._validator_thread = threading.Thread(
+            target=self._validate_existing_proxies_task,
+            daemon=True,
+            name="ProxyValidationThread"
+        )
+        self._validator_thread.start()
+        
+        self._debug_print("代理池后台线程已启动")
     
-    def get_random_proxy(self) -> Optional[Dict]:
-        """随机获取一个代理"""
-        if not self.proxies:
+    def stop(self) -> None:
+        """停止代理池后台线程"""
+        self._debug_print("正在停止代理池...")
+        self._stop_event.set()
+        
+        if self._refresh_thread and self._refresh_thread.is_alive():
+            self._refresh_thread.join(timeout=5)
+        
+        if self._validator_thread and self._validator_thread.is_alive():
+            self._validator_thread.join(timeout=5)
+        
+        self._debug_print("代理池已停止")
+    
+    def get_proxy(self) -> Optional[Dict]:
+        """
+        获取可用代理
+        
+        规则：
+        1. 不允许连续返回相同代理
+        2. 相同代理返回间隔5秒以上
+        3. 优先返回响应快的代理
+        
+        Returns:
+            代理字典，如果没有可用代理则返回None
+        """
+        with self._lock:
+            self._stats["total_requests"] += 1
+            
+            if not self._proxies:
+                self._stats["failed_requests"] += 1
+                self._debug_print("没有可用代理")
+                return None
+            
+            current_time = time.time()
+            
+            # 按响应时间排序
+            sorted_proxies = sorted(self._proxies, key=lambda x: x["response_time"])
+            
+            # 寻找符合条件的代理
+            selected_proxy = None
+            
+            for proxy in sorted_proxies:
+                proxy_str = proxy["proxy_str"]
+                last_used = self._last_used.get(proxy_str, 0)
+                time_since_last_use = current_time - last_used
+                
+                # 检查条件
+                # 1. 不是上一次返回的代理
+                # 2. 距离上次使用超过5秒
+                if (proxy_str != self._last_returned and 
+                    time_since_last_use >= self.proxy_return_interval):
+                    selected_proxy = proxy
+                    break
+            
+            # 如果没有找到符合条件的，选择最早使用的那个
+            if not selected_proxy:
+                # 按最后使用时间排序
+                sorted_by_usage = sorted(
+                    self._proxies,
+                    key=lambda x: self._last_used.get(x["proxy_str"], 0)
+                )
+                
+                # 尝试选择不是上一次返回的
+                for proxy in sorted_by_usage:
+                    if proxy["proxy_str"] != self._last_returned:
+                        selected_proxy = proxy
+                        break
+                
+                # 如果所有代理都是上一次返回的（只有一个代理的情况）
+                if not selected_proxy and self._proxies:
+                    # 检查是否超过5秒
+                    proxy = self._proxies[0]
+                    last_used = self._last_used.get(proxy["proxy_str"], 0)
+                    time_since_last_use = current_time - last_used
+                    
+                    if time_since_last_use >= self.proxy_return_interval:
+                        selected_proxy = proxy
+                    else:
+                        self._debug_print(
+                            f"代理 {proxy['proxy_str']} 距离上次使用仅 {time_since_last_use:.1f}秒，"
+                            f"需要等待 {self.proxy_return_interval - time_since_last_use:.1f}秒"
+                        )
+                        self._stats["failed_requests"] += 1
+                        return None
+            
+            if selected_proxy:
+                # 更新使用记录
+                proxy_str = selected_proxy["proxy_str"]
+                self._last_used[proxy_str] = current_time
+                self._last_returned = proxy_str
+                self._stats["successful_requests"] += 1
+                
+                self._debug_print(
+                    f"返回代理: {proxy_str} (响应时间: {selected_proxy['response_time']:.2f}s)"
+                )
+                return selected_proxy["proxy"]
+            
+            self._stats["failed_requests"] += 1
             return None
-        return random.choice(self.proxies)["proxy"]
     
-    def get_next_proxy(self) -> Optional[Dict]:
-        """轮询获取下一个代理"""
-        if not self.proxies:
-            return None
-        
-        proxy = self.proxies[self.current_index]["proxy"]
-        self.current_index = (self.current_index + 1) % len(self.proxies)
-        return proxy
-    
-    def remove_proxy(self, proxy_str: str) -> None:
-        """移除不可用的代理"""
-        original_count = len(self.proxies)
-        self.proxies = [p for p in self.proxies if p["proxy_str"] != proxy_str]
-        
-        if len(self.proxies) < original_count:
-            print(f"移除不可用代理: {proxy_str}，剩余代理: {len(self.proxies)}")
+    def get_stats(self) -> Dict:
+        """获取代理池统计信息"""
+        with self._lock:
+            return {
+                **self._stats,
+                "current_proxies": len(self._proxies),
+                "last_returned": self._last_returned,
+            }
     
     def has_proxies(self) -> bool:
         """检查是否有可用代理"""
-        return len(self.proxies) > 0
+        with self._lock:
+            return len(self._proxies) > 0
 
 
-# 测试代理管理器
+# 测试
 if __name__ == "__main__":
     print("="*70)
-    print("代理池管理器测试")
+    print("高级代理池测试")
     print("="*70)
     
-    # 创建代理管理器（开启调试模式）
-    proxy_manager = ProxyManager(max_proxies=10, timeout=8, debug=True)
+    # 创建代理池
+    proxy_pool = AdvancedProxyPool(
+        max_proxies=20,
+        validation_interval=60,
+        refresh_interval=300,
+        proxy_return_interval=5.0,
+        debug=True
+    )
     
-    # 获取代理
-    proxy_count = proxy_manager.fetch_proxies()
-    
-    if proxy_count > 0:
-        print(f"\n\n测试最快的代理...")
-        proxy = proxy_manager.get_random_proxy()
-        print(f"使用代理: {proxy}")
+    try:
+        # 启动代理池
+        proxy_pool.start()
         
-        test_urls = [
-            "http://www.baidu.com",
-            "https://leetcode.cn",
-        ]
+        # 等待初始化
+        time.sleep(3)
         
-        for url in test_urls:
-            print(f"\n测试访问: {url}")
-            try:
-                response = requests.get(
-                    url,
-                    proxies=proxy,
-                    timeout=15,
-                    headers=proxy_manager.headers
-                )
-                print(f"  ✅ 成功! 状态码: {response.status_code}")
-            except Exception as e:
-                print(f"  ❌ 失败: {e}")
-    else:
-        print("\n测试失败: 没有可用代理")
+        # 测试获取代理
+        print("\n" + "="*70)
+        print("测试获取代理（连续获取10次）")
+        print("="*70)
+        
+        for i in range(10):
+            print(f"\n第 {i+1} 次请求:")
+            proxy = proxy_pool.get_proxy()
+            
+            if proxy:
+                print(f"  获取到代理: {proxy}")
+                
+                # 测试代理
+                try:
+                    response = requests.get(
+                        "http://www.baidu.com",
+                        proxies=proxy,
+                        timeout=10
+                    )
+                    print(f"  代理测试成功，状态码: {response.status_code}")
+                except Exception as e:
+                    print(f"  代理测试失败: {e}")
+            else:
+                print(f"  没有可用代理")
+            
+            # 等待一小段时间
+            time.sleep(1)
+        
+        # 显示统计
+        print("\n" + "="*70)
+        print("代理池统计")
+        print("="*70)
+        stats = proxy_pool.get_stats()
+        for key, value in stats.items():
+            print(f"  {key}: {value}")
+            
+    except KeyboardInterrupt:
+        print("\n用户中断")
+    finally:
+        proxy_pool.stop()

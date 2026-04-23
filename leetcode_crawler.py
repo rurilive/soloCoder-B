@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-LeetCode每日一题爬虫（增强版）
-- 支持代理池
-- 改进请求头模拟真实浏览器
-- 重试机制和请求间隔
-- 更好的错误处理
+LeetCode每日一题爬虫（增强版 - 使用高级代理池）
+- 集成高级代理池管理器
+- 后台线程自动验证和刷新代理
+- 代理获取规则：不连续返回相同代理，相同代理间隔5秒以上
 """
 
 import requests
@@ -16,17 +15,17 @@ import random
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 
-# 导入代理管理器
+# 导入高级代理池
 try:
-    from proxy_manager import ProxyManager
-    HAS_PROXY_MANAGER = True
+    from proxy_manager import AdvancedProxyPool
+    HAS_PROXY_POOL = True
 except ImportError:
-    HAS_PROXY_MANAGER = False
+    HAS_PROXY_POOL = False
     print("警告: 未找到 proxy_manager.py，将使用直连模式")
 
 
 class LeetCodeCrawler:
-    """LeetCode爬虫类（增强版）"""
+    """LeetCode爬虫类"""
     
     def __init__(self, db_path: str = "leetcode.db", use_proxy: bool = True):
         """
@@ -34,21 +33,19 @@ class LeetCodeCrawler:
         
         Args:
             db_path: SQLite数据库文件路径
-            use_proxy: 是否使用代理
+            use_proxy: 是否使用代理池
         """
         self.db_path = db_path
         self.base_url = "https://leetcode.cn/api/"
         self.graphql_url = "https://leetcode.cn/graphql/"
         
-        # 初始化代理管理器
-        self.use_proxy = use_proxy and HAS_PROXY_MANAGER
-        self.proxy_manager = None
-        self.current_proxy = None
-        self.current_proxy_str = None
+        # 代理池配置
+        self.use_proxy = use_proxy and HAS_PROXY_POOL
+        self.proxy_pool: Optional[AdvancedProxyPool] = None
         
         # 请求间隔配置
-        self.min_delay = 2  # 最小请求间隔（秒）
-        self.max_delay = 5  # 最大请求间隔（秒）
+        self.min_delay = 1.5  # 最小请求间隔（秒）
+        self.max_delay = 3.0  # 最大请求间隔（秒）
         self.retry_count = 3  # 重试次数
         self.retry_delay = 5  # 重试间隔（秒）
         
@@ -58,19 +55,16 @@ class LeetCodeCrawler:
         # 初始化数据库
         self._init_db()
         
-        # 初始化代理（如果需要）
+        # 初始化代理池（如果需要）
         if self.use_proxy:
-            self._init_proxy()
+            self._init_proxy_pool()
     
     def _init_headers(self) -> None:
-        """初始化增强的请求头，模拟真实浏览器"""
-        # 随机选择一个User-Agent
+        """初始化增强的请求头"""
         user_agents = [
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15",
         ]
         
         self.headers = {
@@ -90,59 +84,74 @@ class LeetCodeCrawler:
             "Sec-Fetch-Site": "same-origin",
         }
         
-        # 添加Cookie（模拟已访问过的用户）
+        # 添加Cookie
         self.cookies = {
-            # 一些基本的Cookie，使请求更像真实用户
             "gr_user_id": f"{random.randint(10000000, 99999999)}-{random.randint(1000, 9999)}",
             "gr_session_id": f"{random.randint(10000000, 99999999)}_{random.randint(10000000, 99999999)}",
             "_ga": f"GA1.2.{random.randint(1000000000, 9999999999)}.{int(time.time())}",
             "_gid": f"GA1.2.{random.randint(1000000000, 9999999999)}.{int(time.time())}",
         }
     
-    def _init_proxy(self) -> None:
-        """初始化代理"""
+    def _init_proxy_pool(self) -> None:
+        """初始化高级代理池"""
         if not self.use_proxy:
             return
         
-        print("\n初始化代理池...")
-        self.proxy_manager = ProxyManager(max_proxies=15)
-        proxy_count = self.proxy_manager.fetch_proxies()
+        print("\n" + "="*70)
+        print("初始化高级代理池...")
+        print("="*70)
         
-        if proxy_count > 0:
-            print(f"代理池初始化成功，可用代理: {proxy_count} 个")
-            self._switch_proxy()
+        self.proxy_pool = AdvancedProxyPool(
+            max_proxies=20,
+            validation_interval=60,
+            refresh_interval=300,
+            proxy_return_interval=5.0,
+            timeout=10,
+            debug=True
+        )
+        
+        # 启动代理池
+        self.proxy_pool.start()
+        
+        # 等待代理池初始化
+        print("\n等待代理池初始化...")
+        for i in range(30):
+            time.sleep(1)
+            if self.proxy_pool.has_proxies():
+                print(f"代理池初始化完成！可用代理: {self.proxy_pool.get_stats()['current_proxies']} 个")
+                break
+            if (i + 1) % 5 == 0:
+                print(f"  等待中... ({i+1}/30秒)")
         else:
-            print("警告: 没有可用的代理，将切换到直连模式")
+            print("\n警告: 代理池初始化超时，将切换到直连模式")
             self.use_proxy = False
-            self.current_proxy = None
+            self.proxy_pool.stop()
+            self.proxy_pool = None
     
-    def _switch_proxy(self) -> None:
-        """切换到下一个代理"""
-        if not self.use_proxy or not self.proxy_manager or not self.proxy_manager.has_proxies():
-            self.current_proxy = None
-            self.current_proxy_str = None
-            return
+    def _get_proxy(self) -> Optional[Dict]:
+        """
+        从代理池获取代理
         
-        # 获取下一个代理
-        proxy_data = self.proxy_manager.proxies[self.proxy_manager.current_index]
-        self.current_proxy = proxy_data["proxy"]
-        self.current_proxy_str = proxy_data["proxy_str"]
-        self.proxy_manager.current_index = (self.proxy_manager.current_index + 1) % len(self.proxy_manager.proxies)
+        Returns:
+            代理字典或None
+        """
+        if not self.use_proxy or not self.proxy_pool:
+            return None
         
-        print(f"切换代理: {self.current_proxy_str}")
+        return self.proxy_pool.get_proxy()
     
     def _random_delay(self) -> None:
-        """随机延迟，模拟人类操作"""
+        """随机延迟"""
         delay = random.uniform(self.min_delay, self.max_delay)
         print(f"  等待 {delay:.1f} 秒...")
         time.sleep(delay)
     
     def _make_request(self, method: str, url: str, **kwargs) -> Optional[requests.Response]:
         """
-        发送HTTP请求（带重试和代理支持）
+        发送HTTP请求（带代理支持和重试）
         
         Args:
-            method: HTTP方法（GET/POST）
+            method: HTTP方法
             url: 请求URL
             **kwargs: 其他参数
             
@@ -160,9 +169,11 @@ class LeetCodeCrawler:
                     "timeout": 30,
                 }
                 
-                # 添加代理（如果使用）
-                if self.use_proxy and self.current_proxy:
-                    request_kwargs["proxies"] = self.current_proxy
+                # 获取代理
+                proxy = self._get_proxy()
+                if proxy:
+                    request_kwargs["proxies"] = proxy
+                    print(f"  使用代理: {proxy.get('http', proxy.get('https', '未知'))}")
                 
                 # 合并用户提供的参数
                 request_kwargs.update(kwargs)
@@ -178,42 +189,31 @@ class LeetCodeCrawler:
                     return response
                 elif response.status_code == 429:
                     print(f"  请求被限流 (429)，尝试 {attempt+1}/{self.retry_count}")
-                    if self.use_proxy:
-                        print("  切换代理...")
-                        self._switch_proxy()
-                    else:
-                        print(f"  等待 {self.retry_delay} 秒后重试...")
-                        time.sleep(self.retry_delay)
+                    print(f"  等待 {self.retry_delay} 秒后重试...")
+                    time.sleep(self.retry_delay)
                 else:
                     print(f"  HTTP错误: {response.status_code}")
-                    if self.use_proxy:
-                        print("  切换代理并重试...")
-                        self._switch_proxy()
-                    else:
-                        break
+                    if attempt < self.retry_count - 1:
+                        print(f"  等待 {self.retry_delay} 秒后重试...")
+                        time.sleep(self.retry_delay)
                         
             except requests.exceptions.ProxyError as e:
                 last_exception = e
-                print(f"  代理错误: {e}")
-                if self.use_proxy and self.current_proxy_str:
-                    print(f"  移除不可用代理: {self.current_proxy_str}")
-                    self.proxy_manager.remove_proxy(self.current_proxy_str)
-                    if self.proxy_manager.has_proxies():
-                        self._switch_proxy()
-                    else:
-                        print("  没有可用代理，切换到直连模式")
-                        self.use_proxy = False
-                        self.current_proxy = None
-                        
+                print(f"  代理错误: {str(e)[:50]}")
+                if attempt < self.retry_count - 1:
+                    print(f"  尝试获取新代理并重试...")
+                    time.sleep(1)
+                    
             except requests.exceptions.Timeout as e:
                 last_exception = e
                 print(f"  请求超时: {e}")
-                if self.use_proxy:
-                    self._switch_proxy()
+                if attempt < self.retry_count - 1:
+                    print(f"  等待 {self.retry_delay} 秒后重试...")
+                    time.sleep(self.retry_delay)
                     
             except Exception as e:
                 last_exception = e
-                print(f"  请求错误: {e}")
+                print(f"  请求错误: {str(e)[:50]}")
                 if attempt < self.retry_count - 1:
                     print(f"  等待 {self.retry_delay} 秒后重试...")
                     time.sleep(self.retry_delay)
@@ -273,7 +273,7 @@ class LeetCodeCrawler:
     
     def _graphql_request(self, query: str, variables: Dict[str, Any] = None) -> Optional[Dict]:
         """
-        发送GraphQL请求（增强版）
+        发送GraphQL请求
         
         Args:
             query: GraphQL查询语句
@@ -377,15 +377,7 @@ class LeetCodeCrawler:
         return challenges
     
     def get_problem_detail(self, title_slug: str) -> Optional[Dict]:
-        """
-        获取题目详情
-        
-        Args:
-            title_slug: 题目标识
-            
-        Returns:
-            题目详情
-        """
+        """获取题目详情"""
         query = '''
         query questionData($titleSlug: String!) {
             question(titleSlug: $titleSlug) {
@@ -423,15 +415,7 @@ class LeetCodeCrawler:
         return None
     
     def get_official_solution(self, title_slug: str) -> Optional[Dict]:
-        """
-        获取官方答案
-        
-        Args:
-            title_slug: 题目标识
-            
-        Returns:
-            官方答案
-        """
+        """获取官方答案"""
         query = '''
         query questionSolution($titleSlug: String!) {
             questionSolution(titleSlug: $titleSlug) {
@@ -468,16 +452,7 @@ class LeetCodeCrawler:
         return None
     
     def get_top_comments(self, question_id: int, limit: int = 3) -> List[Dict]:
-        """
-        获取按赞数排序的前N条评论
-        
-        Args:
-            question_id: 题目ID
-            limit: 返回评论数量限制
-            
-        Returns:
-            评论列表
-        """
+        """获取按赞数排序的前N条评论"""
         query = '''
         query QuestionTopics($questionId: Int!, $skip: Int!, $first: Int!, $orderBy: String) {
             questionTopics(
@@ -535,16 +510,7 @@ class LeetCodeCrawler:
         return comments
     
     def save_problem(self, problem_data: Dict, daily_challenge: Dict) -> int:
-        """
-        保存题目到数据库
-        
-        Args:
-            problem_data: 题目详情数据
-            daily_challenge: 每日一题数据（包含日期）
-            
-        Returns:
-            数据库中的题目ID
-        """
+        """保存题目到数据库"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -612,16 +578,7 @@ class LeetCodeCrawler:
             conn.close()
     
     def save_solution(self, problem_id: int, solution: Dict) -> bool:
-        """
-        保存官方答案到数据库
-        
-        Args:
-            problem_id: 数据库中的题目ID
-            solution: 官方答案数据
-            
-        Returns:
-            是否保存成功
-        """
+        """保存官方答案到数据库"""
         if not solution:
             return False
         
@@ -673,16 +630,7 @@ class LeetCodeCrawler:
             conn.close()
     
     def save_comments(self, problem_id: int, comments: List[Dict]) -> int:
-        """
-        保存评论到数据库
-        
-        Args:
-            problem_id: 数据库中的题目ID
-            comments: 评论列表
-            
-        Returns:
-            保存的评论数量
-        """
+        """保存评论到数据库"""
         if not comments:
             return 0
         
@@ -729,9 +677,9 @@ class LeetCodeCrawler:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        print("\n" + "="*60)
+        print("\n" + "="*70)
         print("数据库检查报告")
-        print("="*60)
+        print("="*70)
         
         # 检查表中的数据数量
         cursor.execute("SELECT COUNT(*) FROM problems")
@@ -759,7 +707,7 @@ class LeetCodeCrawler:
                 print(f"  ID: {row[0]}, QuestionID: {row[1]}, 标题: {row[2][:30]}..., 难度: {row[3]}, 日期: {row[4]}")
         
         conn.close()
-        print("\n" + "="*60)
+        print("\n" + "="*70)
     
     def crawl_daily_challenges(self, days: int = 30) -> None:
         """
@@ -775,11 +723,11 @@ class LeetCodeCrawler:
         print(f"找到{len(daily_challenges)}个每日一题")
         
         if len(daily_challenges) == 0:
-            print("\n警告: 没有找到任何每日一题，可能是API请求失败")
+            print("\n❌ 没有找到任何每日一题")
             print("建议:")
-            print("1. 检查网络连接")
-            print("2. 尝试不使用代理模式")
-            print("3. 稍后再试（可能LeetCode有限制）")
+            print("  1. 检查网络连接")
+            print("  2. 尝试不使用代理模式: python leetcode_crawler.py --no-proxy")
+            print("  3. 稍后再试（LeetCode可能有限制）")
             return
         
         for i, challenge in enumerate(daily_challenges):
@@ -787,9 +735,9 @@ class LeetCodeCrawler:
             date = challenge.get("date")
             title = challenge.get("title")
             
-            print(f"\n{'='*60}")
+            print(f"\n{'='*70}")
             print(f"[{i+1}/{len(daily_challenges)}] 处理 {date}: {title}")
-            print(f"{'='*60}")
+            print(f"{'='*70}")
             
             # 获取题目详情
             problem_detail = self.get_problem_detail(title_slug)
@@ -825,6 +773,11 @@ class LeetCodeCrawler:
         
         # 检查数据库
         self.check_database()
+    
+    def stop(self) -> None:
+        """停止爬虫和代理池"""
+        if self.proxy_pool:
+            self.proxy_pool.stop()
 
 
 def main():
@@ -853,26 +806,48 @@ def main():
                 pass
         i += 1
     
-    print(f"LeetCode 每日一题爬虫（增强版）")
-    print(f"="*60)
+    print("\n" + "="*70)
+    print("LeetCode 每日一题爬虫（增强版 - 高级代理池）")
+    print("="*70)
     print(f"目标: 爬取最近 {days} 天的每日一题")
     print(f"代理模式: {'启用' if use_proxy else '禁用'}")
     print(f"开始时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"="*60)
+    print("="*70)
     
-    # 创建爬虫实例
-    crawler = LeetCodeCrawler("leetcode.db", use_proxy=use_proxy)
-    
-    # 先检查现有数据
-    print("\n检查现有数据库...")
-    crawler.check_database()
-    
-    # 开始爬取
-    print("\n开始爬取...")
-    crawler.crawl_daily_challenges(days=days)
-    
-    print(f"\n结束时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("任务完成！")
+    crawler = None
+    try:
+        # 创建爬虫实例
+        crawler = LeetCodeCrawler("leetcode.db", use_proxy=use_proxy)
+        
+        # 先检查现有数据
+        print("\n检查现有数据库...")
+        crawler.check_database()
+        
+        # 开始爬取
+        print("\n开始爬取...")
+        crawler.crawl_daily_challenges(days=days)
+        
+        # 显示代理池统计（如果使用代理）
+        if use_proxy and crawler.proxy_pool:
+            print("\n" + "="*70)
+            print("代理池统计")
+            print("="*70)
+            stats = crawler.proxy_pool.get_stats()
+            for key, value in stats.items():
+                print(f"  {key}: {value}")
+        
+        print(f"\n结束时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print("任务完成！")
+        
+    except KeyboardInterrupt:
+        print("\n\n用户中断，正在清理...")
+    except Exception as e:
+        print(f"\n发生错误: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        if crawler:
+            crawler.stop()
 
 
 if __name__ == "__main__":

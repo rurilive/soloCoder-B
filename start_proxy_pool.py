@@ -164,13 +164,28 @@ def main():
     
     # 导入并启动服务器
     try:
-        from proxy_pool.server import app, setup_logging, get_config
+        from proxy_pool.server import app, setup_logging, get_config, get_proxy_pool
         
         # 设置日志
         setup_logging()
         
         # 获取配置
         config = get_config()
+        
+        # 立即初始化代理池（启动前自动搜集代理）
+        print("\n正在初始化代理池，开始自动搜集代理...")
+        print("这可能需要一些时间，请耐心等待...\n")
+        
+        # 调用 get_proxy_pool() 会立即：
+        # 1. 创建 ProxyPool 实例
+        # 2. 调用 start() 方法
+        # 3. start() 会同步从各代理源获取代理并验证
+        # 4. 启动后台线程定期刷新和验证
+        get_proxy_pool()
+        
+        print("\n代理池初始化完成！")
+        print("后台线程已启动，将定期自动刷新和验证代理")
+        print("=" * 70)
         
         # 启动 Flask 应用
         app.run(

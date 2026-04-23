@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}题库 - LeetCode 克隆{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1 class="page-title">题库</h1>
+        <p class="page-subtitle">选择一道题目开始练习</p>
+    </div>
+    
+    <div class="card">
+        <form method="GET" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <label style="font-weight: 500;">难度:</label>
+                <select name="difficulty" class="form-select" style="width: auto;">
+                    <option value="">全部</option>
+                    <option value="easy" {% if difficulty == 'easy' %}selected{% endif %}>简单</option>
+                    <option value="medium" {% if difficulty == 'medium' %}selected{% endif %}>中等</option>
+                    <option value="hard" {% if difficulty == 'hard' %}selected{% endif %}>困难</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">筛选</button>
+            <a href="{{ url_for('problems.list') }}" class="btn btn-outline">重置</a>
+        </form>
+    </div>
+    
+    <div class="card">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width: 80px;">#</th>
+                    <th>题目</th>
+                    <th style="width: 120px;">难度</th>
+                    <th style="width: 120px;">状态</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for problem in problems %}
+                <tr>
+                    <td style="color: #6c757d;">{{ problem.id }}</td>
+                    <td>
+                        <a href="{{ url_for('problems.detail', problem_id=problem.id) }}" style="color: #333; text-decoration: none; font-weight: 500;">
+                            {{ problem.title }}
+                        </a>
+                    </td>
+                    <td>
+                        <span class="difficulty-{{ problem.difficulty }}">
+                            {{ problem.get_difficulty_display() }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if problem.id in user_statuses %}
+                            {% set status = user_statuses[problem.id] %}
+                            {% if status == 'accepted' %}
+                                <span style="color: #28a745; font-weight: 600;">✓ 通过</span>
+                            {% else %}
+                                <span style="color: #ffc107; font-weight: 600;">● 尝试过</span>
+                            {% endif %}
+                        {% else %}
+                            <span style="color: #6c757d;">- 未尝试</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" style="text-align: center; padding: 2rem; color: #6c757d;">
+                        暂无题目
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        {% if pagination.pages > 1 %}
+        <div class="pagination" style="margin-top: 1.5rem;">
+            {% if pagination.has_prev %}
+                <a href="{{ url_for('problems.list', page=pagination.prev_num, difficulty=difficulty) }}">上一页</a>
+            {% endif %}
+            
+            {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if page_num %}
+                    {% if page_num == pagination.page %}
+                        <span class="current">{{ page_num }}</span>
+                    {% else %}
+                        <a href="{{ url_for('problems.list', page=page_num, difficulty=difficulty) }}">{{ page_num }}</a>
+                    {% endif %}
+                {% else %}
+                    <span>...</span>
+                {% endif %}
+            {% endfor %}
+            
+            {% if pagination.has_next %}
+                <a href="{{ url_for('problems.list', page=pagination.next_num, difficulty=difficulty) }}">下一页</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

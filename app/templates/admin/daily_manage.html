@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}每日一题管理 - LeetCode 克隆{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1 class="page-title">每日一题管理</h1>
+        <p class="page-subtitle">设置和管理每日一题</p>
+    </div>
+    
+    <div class="row">
+        <div class="col-6">
+            <div class="card">
+                <div class="card-header">设置每日一题</div>
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="form-group">
+                        {{ form.target_date.label(class="form-label") }}
+                        {{ form.target_date(class="form-control", type="date") }}
+                        {% for error in form.target_date.errors %}
+                            <small class="text-danger">{{ error }}</small>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="form-group">
+                        {{ form.problem_id.label(class="form-label") }}
+                        {{ form.problem_id(class="form-select") }}
+                        {% for error in form.problem_id.errors %}
+                            <small class="text-danger">{{ error }}</small>
+                        {% endfor %}
+                    </div>
+                    
+                    {{ form.submit(class="btn btn-primary", style="width: 100%; padding: 0.75rem;") }}
+                </form>
+            </div>
+        </div>
+        
+        <div class="col-6">
+            <div class="card">
+                <div class="card-header">当前每日一题</div>
+                {% if current_daily %}
+                <div style="padding: 1rem 0;">
+                    <div style="font-size: 0.9rem; color: #6c757d; margin-bottom: 0.5rem;">
+                        日期: {{ current_daily.date }}
+                    </div>
+                    <div style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">
+                        #{{ current_daily.problem.id }}. {{ current_daily.problem.title }}
+                    </div>
+                    <div style="margin-bottom: 1rem;">
+                        <span class="difficulty-{{ current_daily.problem.difficulty }}">
+                            {{ current_daily.problem.get_difficulty_display() }}
+                        </span>
+                        &nbsp;|&nbsp;
+                        {% if current_daily.problem.is_active %}
+                            <span style="color: #28a745;">已启用</span>
+                        {% else %}
+                            <span style="color: #dc3545;">已禁用</span>
+                        {% endif %}
+                    </div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <a href="{{ url_for('daily.today') }}" class="btn btn-outline">查看题目</a>
+                        <a href="{{ url_for('problems.detail', problem_id=current_daily.problem.id) }}" class="btn btn-outline">去做题</a>
+                    </div>
+                </div>
+                {% else %}
+                <div style="text-align: center; padding: 2rem; color: #6c757d;">
+                    <p>今日暂无设置每日一题</p>
+                    <p style="font-size: 0.9rem; margin-top: 0.5rem;">
+                        请从左侧选择一个题目设置为今日一题
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="card">
+                <div class="card-header">快速说明</div>
+                <div style="font-size: 0.9rem; color: #6c757d; line-height: 1.8;">
+                    <p>• 每日一题会在首页显示给所有用户</p>
+                    <p>• 用户可以通过导航栏的"每日一题"快速访问</p>
+                    <p>• 题目必须是"已启用"状态才能正常访问</p>
+                    <p>• 如果没有设置今日一题，系统会自动选择第一个启用的题目</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

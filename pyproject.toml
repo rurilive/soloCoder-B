@@ -1,0 +1,36 @@
+[project]
+name = "leetcode-clone"
+version = "0.1.0"
+description = "A LeetCode-like coding platform with daily problems, test runner, and user management"
+requires-python = ">=3.10"
+dependencies = [
+    "flask>=3.0.0",
+    "flask-sqlalchemy>=3.1.0",
+    "flask-login>=0.6.3",
+    "werkzeug>=3.0.0",
+    "flask-wtf>=1.2.1",
+    "wtforms>=3.1.0",
+    "email-validator>=2.3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-flask>=1.3.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-flask>=1.3.0",
+]

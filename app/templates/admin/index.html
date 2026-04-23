@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}管理后台 - LeetCode 克隆{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1 class="page-title">管理后台</h1>
+        <p class="page-subtitle">平台管理与统计</p>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; margin-bottom: 2rem;">
+        <div class="card" style="text-align: center;">
+            <div style="font-size: 2.5rem; font-weight: bold; color: #e94560;">
+                {{ stats.total_users }}
+            </div>
+            <div style="color: #6c757d;">注册用户</div>
+        </div>
+        <div class="card" style="text-align: center;">
+            <div style="font-size: 2.5rem; font-weight: bold; color: #667eea;">
+                {{ stats.total_problems }}
+            </div>
+            <div style="color: #6c757d;">题目总数</div>
+        </div>
+        <div class="card" style="text-align: center;">
+            <div style="font-size: 2.5rem; font-weight: bold; color: #28a745;">
+                {{ stats.active_problems }}
+            </div>
+            <div style="color: #6c757d;">可用题目</div>
+        </div>
+        <div class="card" style="text-align: center;">
+            <div style="font-size: 2.5rem; font-weight: bold; color: #ffc107;">
+                {{ stats.total_submissions }}
+            </div>
+            <div style="color: #6c757d;">提交总数</div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-6">
+            <div class="card">
+                <div class="card-header">快速操作</div>
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <a href="{{ url_for('admin.problem_create') }}" class="btn btn-primary" style="text-align: center;">
+                        ➕ 创建新题目
+                    </a>
+                    <a href="{{ url_for('admin.problems_list') }}" class="btn btn-outline" style="text-align: center;">
+                        📋 管理题目
+                    </a>
+                    <a href="{{ url_for('admin.users_list') }}" class="btn btn-outline" style="text-align: center;">
+                        👥 管理用户
+                    </a>
+                    <a href="{{ url_for('admin.daily_manage') }}" class="btn btn-outline" style="text-align: center;">
+                        🔥 管理每日一题
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-6">
+            <div class="card">
+                <div class="card-header">最近提交</div>
+                {% if recent_submissions %}
+                <table class="table" style="font-size: 0.9rem;">
+                    <thead>
+                        <tr>
+                            <th>用户</th>
+                            <th>题目</th>
+                            <th>状态</th>
+                            <th>时间</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sub in recent_submissions %}
+                        <tr>
+                            <td>{{ sub.user.username }}</td>
+                            <td>#{{ sub.problem_id }}</td>
+                            <td><span class="status-{{ sub.status }}">{{ sub.get_status_display() }}</span></td>
+                            <td style="color: #6c757d; font-size: 0.8rem;">
+                                {{ sub.created_at.strftime('%m-%d %H:%M') }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p style="color: #6c757d; text-align: center; padding: 2rem;">暂无提交记录</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

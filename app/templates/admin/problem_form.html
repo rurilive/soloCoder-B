@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - LeetCode 克隆{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1 class="page-title">{{ title }}</h1>
+        <p class="page-subtitle">
+            {% if problem %}
+                <a href="{{ url_for('problems.detail', problem_id=problem.id) }}" style="color: #e94560; text-decoration: none;">
+                    预览题目
+                </a>
+            {% endif %}
+        </p>
+    </div>
+    
+    <div class="card">
+        <form method="POST">
+            {{ form.hidden_tag() }}
+            
+            <div class="row">
+                <div class="col-6">
+                    <div class="form-group">
+                        {{ form.title.label(class="form-label") }}
+                        {{ form.title(class="form-control", placeholder="请输入题目标题") }}
+                        {% for error in form.title.errors %}
+                            <small class="text-danger">{{ error }}</small>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="form-group">
+                                {{ form.difficulty.label(class="form-label") }}
+                                {{ form.difficulty(class="form-select") }}
+                                {% for error in form.difficulty.errors %}
+                                    <small class="text-danger">{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="form-group">
+                                {{ form.function_name.label(class="form-label") }}
+                                {{ form.function_name(class="form-control", placeholder="例如: two_sum") }}
+                                {% for error in form.function_name.errors %}
+                                    <small class="text-danger">{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                {{ form.description.label(class="form-label") }}
+                {{ form.description(class="form-control", rows=10, placeholder="请输入题目描述...") }}
+                {% for error in form.description.errors %}
+                    <small class="text-danger">{{ error }}</small>
+                {% endfor %}
+            </div>
+            
+            <div class="form-group">
+                {{ form.test_cases.label(class="form-label") }}
+                {{ form.test_cases(class="form-control", rows=12, style="font-family: monospace;", placeholder='请输入测试用例 (JSON数组格式):
+
+[
+    {"input": {"nums": [2,7,11,15], "target": 9}, "expected": [0, 1], "hidden": false},
+    {"input": {"nums": [3,2,4], "target": 6}, "expected": [1, 2], "hidden": true}
+]
+
+说明:
+- input: 函数的参数（字典或列表）
+- expected: 预期的输出
+- hidden: 是否为隐藏测试用例（true=隐藏，false=显示）') }}
+                {% for error in form.test_cases.errors %}
+                    <small class="text-danger">{{ error }}</small>
+                {% endfor %}
+                <div class="form-text">
+                    测试用例必须是 JSON 数组格式，每个测试用例包含 <code>input</code>、<code>expected</code> 和可选的 <code>hidden</code> 字段。
+                </div>
+            </div>
+            
+            <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem;">
+                {{ form.is_active() }}
+                {{ form.is_active.label(style="margin-bottom: 0;") }}
+            </div>
+            
+            <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                {{ form.submit(class="btn btn-primary", style="padding: 0.75rem 2rem;") }}
+                <a href="{{ url_for('admin.problems_list') }}" class="btn btn-secondary" style="padding: 0.75rem 2rem;">
+                    取消
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

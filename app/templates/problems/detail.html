@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}{{ problem.title }} - LeetCode 克隆{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <h1 class="page-title">#{{ problem.id }}. {{ problem.title }}</h1>
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <span class="difficulty-{{ problem.difficulty }}">
+                    {{ problem.get_difficulty_display() }}
+                </span>
+                {% if user_submission %}
+                    <span class="status-{{ user_submission.status }}">
+                        上次提交: {{ user_submission.get_status_display() }}
+                    </span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-6">
+            <div class="card">
+                <div class="card-header">题目描述</div>
+                <div style="white-space: pre-wrap; line-height: 1.8;">
+                    {{ problem.description }}
+                </div>
+            </div>
+            
+            {% if sample_test_cases %}
+            <div class="card">
+                <div class="card-header">示例</div>
+                {% for tc in sample_test_cases %}
+                <div style="margin-bottom: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 4px;">
+                    <div style="font-weight: 600; margin-bottom: 0.5rem;">示例 {{ loop.index }}</div>
+                    <div style="font-family: monospace;">
+                        <div><strong>输入:</strong> {{ tc.input }}</div>
+                        <div><strong>输出:</strong> {{ tc.expected }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="col-6">
+            <div class="card">
+                <div class="card-header">代码编辑器</div>
+                {% if current_user.is_authenticated %}
+                <form method="POST" action="{{ url_for('problems.submit', problem_id=problem.id) }}">
+                    <div class="form-group">
+                        <label class="form-label">函数名: <code>{{ problem.function_name }}</code></label>
+                        <textarea 
+                            name="code" 
+                            class="form-control" 
+                            rows="20" 
+                            style="font-family: 'Fira Code', monospace; font-size: 14px; line-height: 1.5;"
+                            placeholder="请输入您的 Python 代码...
+
+例如:
+def {{ problem.function_name }}(参数):
+    # 实现逻辑
+    return 结果"
+                        >{% if user_submission %}{{ user_submission.code }}{% endif %}</textarea>
+                        <div class="form-text">
+                            请编写一个名为 <code>{{ problem.function_name }}</code> 的函数来解决问题。
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.75rem; font-size: 1.1rem;">
+                        提交代码
+                    </button>
+                </form>
+                {% else %}
+                <div style="text-align: center; padding: 3rem;">
+                    <p style="color: #6c757d; margin-bottom: 1rem;">请先登录以提交代码</p>
+                    <a href="{{ url_for('auth.login') }}" class="btn btn-primary">登录</a>
+                    <a href="{{ url_for('auth.register') }}" class="btn btn-outline" style="margin-left: 0.5rem;">注册</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

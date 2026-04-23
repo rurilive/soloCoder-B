@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}用户管理 - LeetCode 克隆{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1 class="page-title">用户管理</h1>
+        <p class="page-subtitle">管理所有注册用户</p>
+    </div>
+    
+    <div class="card">
+        {% if users %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width: 80px;">#</th>
+                    <th>用户名</th>
+                    <th>邮箱</th>
+                    <th style="width: 100px;">管理员</th>
+                    <th style="width: 200px;">注册时间</th>
+                    <th style="width: 150px;">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>{{ user.id }}</td>
+                    <td>
+                        <strong>{{ user.username }}</strong>
+                        {% if user.is_admin %}
+                            <span style="font-size: 0.75rem; background: #ffc107; color: #000; padding: 0.125rem 0.5rem; border-radius: 4px; margin-left: 0.5rem;">管理员</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ user.email }}</td>
+                    <td>
+                        {% if user.is_admin %}
+                            <span style="color: #ffc107; font-weight: 600;">✓ 是</span>
+                        {% else %}
+                            <span style="color: #6c757d;">✗ 否</span>
+                        {% endif %}
+                    </td>
+                    <td style="color: #6c757d; font-size: 0.9rem;">
+                        {{ user.created_at.strftime('%Y-%m-%d %H:%M') }}
+                    </td>
+                    <td>
+                        {% if user.id != current_user.id %}
+                        <form method="POST" action="{{ url_for('admin.user_toggle_admin', user_id=user.id) }}" style="display: inline;">
+                            <button type="submit" style="background: none; border: none; color: #667eea; cursor: pointer; padding: 0; font-size: 1rem; text-decoration: underline;">
+                                {% if user.is_admin %}取消管理员{% else %}设为管理员{% endif %}
+                            </button>
+                        </form>
+                        {% else %}
+                        <span style="color: #6c757d;">当前用户</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div style="text-align: center; padding: 3rem; color: #6c757d;">
+            <p>暂无用户</p>
+        </div>
+        {% endif %}
+        
+        {% if pagination.pages > 1 %}
+        <div class="pagination" style="margin-top: 1.5rem;">
+            {% if pagination.has_prev %}
+                <a href="{{ url_for('admin.users_list', page=pagination.prev_num) }}">上一页</a>
+            {% endif %}
+            
+            {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if page_num %}
+                    {% if page_num == pagination.page %}
+                        <span class="current">{{ page_num }}</span>
+                    {% else %}
+                        <a href="{{ url_for('admin.users_list', page=page_num) }}">{{ page_num }}</a>
+                    {% endif %}
+                {% else %}
+                    <span>...</span>
+                {% endif %}
+            {% endfor %}
+            
+            {% if pagination.has_next %}
+                <a href="{{ url_for('admin.users_list', page=pagination.next_num) }}">下一页</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

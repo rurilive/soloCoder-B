@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}登录 - LeetCode 克隆{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 500px;">
+    <div class="page-header" style="text-align: center; margin-bottom: 2rem;">
+        <h1 class="page-title">登录</h1>
+        <p class="page-subtitle">欢迎回来！请登录您的账号。</p>
+    </div>
+    
+    <div class="card">
+        <form method="POST" action="{{ url_for('auth.login') }}">
+            {{ form.hidden_tag() }}
+            
+            <div class="form-group">
+                {{ form.email.label(class="form-label") }}
+                {{ form.email(class="form-control", placeholder="请输入邮箱") }}
+                {% for error in form.email.errors %}
+                    <small class="text-danger">{{ error }}</small>
+                {% endfor %}
+            </div>
+            
+            <div class="form-group">
+                {{ form.password.label(class="form-label") }}
+                {{ form.password(class="form-control", placeholder="请输入密码") }}
+                {% for error in form.password.errors %}
+                    <small class="text-danger">{{ error }}</small>
+                {% endfor %}
+            </div>
+            
+            <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem;">
+                {{ form.remember() }}
+                {{ form.remember.label() }}
+            </div>
+            
+            <div class="form-group" style="margin-top: 1.5rem;">
+                {{ form.submit(class="btn btn-primary", style="width: 100%; padding: 0.75rem;") }}
+            </div>
+        </form>
+        
+        <div style="text-align: center; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e9ecef;">
+            <p style="color: #6c757d;">
+                还没有账号？
+                <a href="{{ url_for('auth.register') }}" style="color: #e94560; text-decoration: none; font-weight: 500;">
+                    立即注册
+                </a>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

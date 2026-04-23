@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}服务器错误 - LeetCode 克隆{% endblock %}
+
+{% block content %}
+<div class="container" style="text-align: center; padding: 4rem 2rem;">
+    <div style="font-size: 8rem; font-weight: bold; color: #dc3545; margin-bottom: 1rem;">500</div>
+    <h1 class="page-title" style="margin-bottom: 1rem;">服务器内部错误</h1>
+    <p class="page-subtitle" style="margin-bottom: 2rem;">
+        抱歉，服务器遇到了一些问题。请稍后再试。
+    </p>
+    <a href="{{ url_for('main.index') }}" class="btn btn-primary">返回首页</a>
+</div>
+{% endblock %}

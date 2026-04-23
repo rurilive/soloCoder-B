@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}提交详情 - LeetCode 克隆{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1 class="page-title">提交详情</h1>
+        <p class="page-subtitle">
+            <a href="{{ url_for('problems.detail', problem_id=problem.id) }}" style="color: #e94560; text-decoration: none;">
+                #{{ problem.id }}. {{ problem.title }}
+            </a>
+        </p>
+    </div>
+    
+    <div class="card" style="border-left: 4px solid {% if submission.status == 'accepted' %}#28a745{% else %}#dc3545{% endif %};">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <div>
+                <div style="font-size: 1.5rem; font-weight: 600; margin-bottom: 0.5rem;">
+                    <span class="status-{{ submission.status }}">
+                        {{ submission.get_status_display() }}
+                    </span>
+                </div>
+                <div style="color: #6c757d;">
+                    提交时间: {{ submission.created_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                    {% if submission.runtime %}
+                        &nbsp;|&nbsp;运行时间: {{ submission.runtime }}ms
+                    {% endif %}
+                </div>
+            </div>
+            <a href="{{ url_for('problems.detail', problem_id=problem.id) }}" class="btn btn-outline">
+                重新提交
+            </a>
+        </div>
+    </div>
+    
+    {% if submission.error_message %}
+    <div class="card">
+        <div class="card-header" style="color: #dc3545;">错误信息</div>
+        <pre style="background: #fff5f5; color: #721c24; border: 1px solid #f5c6cb; margin: 0;">{{ submission.error_message }}</pre>
+    </div>
+    {% endif %}
+    
+    {% if test_results %}
+    <div class="card">
+        <div class="card-header">测试结果</div>
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+            {% for result in test_results %}
+                <div style="width: 40px; height: 40px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: 600; background: {% if result.passed %}#28a745{% else %}#dc3545{% endif %}; color: #fff;">
+                    {{ result.test_case }}
+                </div>
+            {% endfor %}
+        </div>
+        
+        {% for result in test_results %}
+            {% if not result.passed and not result.hidden %}
+            <div style="border: 1px solid #f5c6cb; border-radius: 4px; padding: 1rem; margin-bottom: 1rem; background: #fff5f5;">
+                <div style="font-weight: 600; margin-bottom: 0.5rem; color: #721c24;">
+                    ❌ 测试用例 {{ result.test_case }} 未通过
+                </div>
+                {% if result.input is not none %}
+                <div style="font-family: monospace; font-size: 0.9rem;">
+                    <div><strong>输入:</strong> {{ result.input }}</div>
+                    <div><strong>预期输出:</strong> {{ result.expected }}</div>
+                    <div><strong>实际输出:</strong> {{ result.output }}</div>
+                </div>
+                {% endif %}
+                {% if result.error %}
+                <div style="margin-top: 0.5rem; color: #dc3545; font-family: monospace;">
+                    <strong>错误:</strong> {{ result.error }}
+                </div>
+                {% endif %}
+            </div>
+            {% elif result.hidden and not result.passed %}
+            <div style="border: 1px solid #ffeaa7; border-radius: 4px; padding: 1rem; margin-bottom: 1rem; background: #fffde7;">
+                <div style="font-weight: 600; margin-bottom: 0.5rem; color: #856404;">
+                    ❌ 隐藏测试用例 {{ result.test_case }} 未通过
+                </div>
+                <div style="color: #856404; font-size: 0.9rem;">
+                    隐藏测试用例的详细信息不会显示。请检查您的代码逻辑。
+                </div>
+            </div>
+            {% endif %}
+        {% endfor %}
+        
+        <div style="text-align: center; padding: 1rem; background: #f8f9fa; border-radius: 4px; margin-top: 1rem;">
+            <span style="font-weight: 600;">
+                {{ test_results|selectattr('passed')|list|length }} / {{ test_results|length }} 个测试用例通过
+            </span>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="card">
+        <div class="card-header">提交的代码</div>
+        <pre style="margin: 0; background: #f8f9fa;"><code>{{ submission.code }}</code></pre>
+    </div>
+</div>
+{% endblock %}

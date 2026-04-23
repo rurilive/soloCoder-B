@@ -15,13 +15,13 @@ import random
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 
-# 导入高级代理池
+# 导入代理池模块
 try:
-    from proxy_manager import AdvancedProxyPool
+    from proxy_pool import ProxyPool
     HAS_PROXY_POOL = True
 except ImportError:
     HAS_PROXY_POOL = False
-    print("警告: 未找到 proxy_manager.py，将使用直连模式")
+    print("警告: 未找到 proxy_pool 模块，将使用直连模式")
 
 
 class LeetCodeCrawler:
@@ -93,15 +93,15 @@ class LeetCodeCrawler:
         }
     
     def _init_proxy_pool(self) -> None:
-        """初始化高级代理池"""
+        """初始化代理池"""
         if not self.use_proxy:
             return
         
         print("\n" + "="*70)
-        print("初始化高级代理池...")
+        print("初始化代理池...")
         print("="*70)
         
-        self.proxy_pool = AdvancedProxyPool(
+        self.proxy_pool = ProxyPool(
             max_proxies=20,
             validation_interval=60,
             refresh_interval=300,
@@ -109,6 +109,20 @@ class LeetCodeCrawler:
             timeout=10,
             debug=True
         )
+        
+        # 添加回调函数
+        def on_proxy_invalid(proxy_str, proxy_info):
+            print(f"  [代理事件] 代理 {proxy_str} 被标记为无效，已从池中移除")
+        
+        def on_proxy_removed(proxy_str, proxy_info):
+            print(f"  [代理事件] 代理 {proxy_str} 已从池中移除")
+        
+        def on_proxy_added(proxy_str, proxy_info):
+            print(f"  [代理事件] 新代理 {proxy_str} 已添加到池中")
+        
+        self.proxy_pool.add_callback('proxy_invalid', on_proxy_invalid)
+        self.proxy_pool.add_callback('proxy_removed', on_proxy_removed)
+        self.proxy_pool.add_callback('proxy_added', on_proxy_added)
         
         # 启动代理池
         self.proxy_pool.start()
@@ -146,9 +160,23 @@ class LeetCodeCrawler:
         print(f"  等待 {delay:.1f} 秒...")
         time.sleep(delay)
     
+    def _report_proxy_status(self, proxy: Optional[Dict], is_valid: bool, reason: str = None) -> None:
+        """
+        汇报代理使用状态
+        
+        Args:
+            proxy: 代理字典
+            is_valid: 是否有效
+            reason: 原因
+        """
+        if not proxy or not self.use_proxy or not self.proxy_pool:
+            return
+        
+        self.proxy_pool.report_proxy_status(proxy, is_valid, reason)
+    
     def _make_request(self, method: str, url: str, **kwargs) -> Optional[requests.Response]:
         """
-        发送HTTP请求（带代理支持和重试）
+        发送HTTP请求（带代理支持和重试，以及代理汇报机制）
         
         Args:
             method: HTTP方法
@@ -161,6 +189,7 @@ class LeetCodeCrawler:
         last_exception = None
         
         for attempt in range(self.retry_count):
+            proxy = None
             try:
                 # 准备请求参数
                 request_kwargs = {
@@ -186,20 +215,29 @@ class LeetCodeCrawler:
                 
                 # 检查状态码
                 if response.status_code == 200:
+                    # 汇报代理有效
+                    self._report_proxy_status(proxy, is_valid=True)
                     return response
                 elif response.status_code == 429:
                     print(f"  请求被限流 (429)，尝试 {attempt+1}/{self.retry_count}")
+                    # 429 通常是目标网站限流，不是代理问题，汇报为有效
+                    self._report_proxy_status(proxy, is_valid=True, reason="目标网站限流")
                     print(f"  等待 {self.retry_delay} 秒后重试...")
                     time.sleep(self.retry_delay)
                 else:
                     print(f"  HTTP错误: {response.status_code}")
+                    # HTTP错误可能是代理问题，汇报为无效
+                    self._report_proxy_status(proxy, is_valid=False, reason=f"HTTP错误 {response.status_code}")
                     if attempt < self.retry_count - 1:
                         print(f"  等待 {self.retry_delay} 秒后重试...")
                         time.sleep(self.retry_delay)
                         
             except requests.exceptions.ProxyError as e:
                 last_exception = e
-                print(f"  代理错误: {str(e)[:50]}")
+                error_msg = str(e)[:50]
+                print(f"  代理错误: {error_msg}")
+                # 代理错误，汇报为无效，代理将从池中移除
+                self._report_proxy_status(proxy, is_valid=False, reason=f"代理错误: {error_msg}")
                 if attempt < self.retry_count - 1:
                     print(f"  尝试获取新代理并重试...")
                     time.sleep(1)
@@ -207,13 +245,18 @@ class LeetCodeCrawler:
             except requests.exceptions.Timeout as e:
                 last_exception = e
                 print(f"  请求超时: {e}")
+                # 超时可能是代理问题，汇报为无效
+                self._report_proxy_status(proxy, is_valid=False, reason=f"请求超时")
                 if attempt < self.retry_count - 1:
                     print(f"  等待 {self.retry_delay} 秒后重试...")
                     time.sleep(self.retry_delay)
                     
             except Exception as e:
                 last_exception = e
-                print(f"  请求错误: {str(e)[:50]}")
+                error_msg = str(e)[:50]
+                print(f"  请求错误: {error_msg}")
+                # 其他错误也可能是代理问题，汇报为无效
+                self._report_proxy_status(proxy, is_valid=False, reason=f"请求错误: {error_msg}")
                 if attempt < self.retry_count - 1:
                     print(f"  等待 {self.retry_delay} 秒后重试...")
                     time.sleep(self.retry_delay)

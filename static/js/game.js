@@ -357,8 +357,34 @@ class Game {
     }
     
     updateBullets() {
+        this.bullets.forEach(bullet => bullet.update());
+        
+        const bulletsToRemove = new Set();
+        
+        const playerBullets = this.bullets.filter(b => b.isPlayerBullet);
+        const enemyBullets = this.bullets.filter(b => !b.isPlayerBullet);
+        
+        for (let i = 0; i < playerBullets.length; i++) {
+            for (let j = 0; j < enemyBullets.length; j++) {
+                const pBullet = playerBullets[i];
+                const eBullet = enemyBullets[j];
+                
+                if (this.bulletsIntersect(pBullet, eBullet)) {
+                    bulletsToRemove.add(pBullet);
+                    bulletsToRemove.add(eBullet);
+                    this.createExplosion(
+                        (pBullet.x + eBullet.x) / 2,
+                        (pBullet.y + eBullet.y) / 2,
+                        false
+                    );
+                }
+            }
+        }
+        
         this.bullets = this.bullets.filter(bullet => {
-            bullet.update();
+            if (bulletsToRemove.has(bullet)) {
+                return false;
+            }
             
             if (bullet.x < 0 || bullet.x > CANVAS_SIZE || bullet.y < 0 || bullet.y > CANVAS_SIZE) {
                 return false;
@@ -427,6 +453,13 @@ class Game {
             
             return true;
         });
+    }
+    
+    bulletsIntersect(bullet1, bullet2) {
+        const dx = bullet1.x - bullet2.x;
+        const dy = bullet1.y - bullet2.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        return distance < (bullet1.size + bullet2.size) / 2;
     }
     
     createExplosion(x, y, large = true) {

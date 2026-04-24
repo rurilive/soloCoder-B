@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}感谢您的参与 - {{ survey.title }}{% endblock %}
+
+{% block content %}
+<div class="thank-you-container">
+    <div class="card thank-you-card">
+        <div class="thank-you-header">
+            <div class="success-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+            </div>
+            <h1 class="thank-you-title">感谢您的参与！</h1>
+            <p class="thank-you-message">您的回答已成功提交，感谢您抽出宝贵时间完成此问卷。</p>
+        </div>
+        
+        <div class="thank-you-actions">
+            <div class="action-buttons">
+                <a href="{{ url_for('main.index') }}" class="btn btn-primary">返回首页</a>
+                {% if current_user.is_authenticated %}
+                <a href="{{ url_for('survey.list') }}" class="btn btn-secondary">我的问卷</a>
+                {% endif %}
+            </div>
+        </div>
+        
+        {% if survey.description %}
+        <div class="thank-you-footer">
+            <p class="footer-note">{{ survey.description }}</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .thank-you-container {
+        max-width: 550px;
+        margin: 80px auto;
+    }
+    
+    .thank-you-card {
+        text-align: center;
+        padding: 50px 40px;
+    }
+    
+    .success-icon {
+        color: #27ae60;
+        margin-bottom: 25px;
+    }
+    
+    .thank-you-header {
+        margin-bottom: 30px;
+    }
+    
+    .thank-you-title {
+        color: #333;
+        margin-bottom: 15px;
+        font-size: 1.8rem;
+    }
+    
+    .thank-you-message {
+        color: #666;
+        font-size: 1.1rem;
+        line-height: 1.6;
+        margin: 0;
+    }
+    
+    .thank-you-actions {
+        margin-bottom: 30px;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .btn-primary {
+        background: #667eea;
+        color: white;
+        padding: 12px 30px;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 500;
+        text-decoration: none;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+    
+    .btn-primary:hover {
+        background: #5568d3;
+        color: white;
+    }
+    
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+        padding: 12px 30px;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 500;
+        text-decoration: none;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+    
+    .btn-secondary:hover {
+        background: #5a6268;
+        color: white;
+    }
+    
+    .thank-you-footer {
+        padding-top: 25px;
+        border-top: 1px solid #f0f0f0;
+    }
+    
+    .footer-note {
+        color: #999;
+        font-size: 0.9rem;
+        margin: 0;
+        line-height: 1.5;
+    }
+    
+    @media (max-width: 480px) {
+        .thank-you-container {
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+        
+        .thank-you-card {
+            padding: 30px 20px;
+        }
+        
+        .action-buttons {
+            flex-direction: column;
+        }
+        
+        .action-buttons a {
+            width: 100%;
+            text-align: center;
+        }
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}已完成问卷 - {{ survey.title }}{% endblock %}
+
+{% block content %}
+<div class="already-answered-container">
+    <div class="card already-answered-card">
+        <div class="already-answered-header">
+            <div class="info-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+            </div>
+            <h1 class="already-answered-title">您已完成此问卷</h1>
+            <p class="already-answered-message">感谢您的参与！您已经填写过此问卷，无需重复提交。</p>
+        </div>
+        
+        <div class="already-answered-actions">
+            <div class="action-buttons">
+                <a href="{{ url_for('main.index') }}" class="btn btn-primary">返回首页</a>
+                {% if current_user.is_authenticated %}
+                <a href="{{ url_for('survey.list') }}" class="btn btn-secondary">我的问卷</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .already-answered-container {
+        max-width: 550px;
+        margin: 80px auto;
+    }
+    
+    .already-answered-card {
+        text-align: center;
+        padding: 50px 40px;
+    }
+    
+    .info-icon {
+        color: #3498db;
+        margin-bottom: 25px;
+    }
+    
+    .already-answered-header {
+        margin-bottom: 30px;
+    }
+    
+    .already-answered-title {
+        color: #333;
+        margin-bottom: 15px;
+        font-size: 1.6rem;
+    }
+    
+    .already-answered-message {
+        color: #666;
+        font-size: 1.1rem;
+        line-height: 1.6;
+        margin: 0;
+    }
+    
+    .already-answered-actions {
+        margin-bottom: 0;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .btn-primary {
+        background: #667eea;
+        color: white;
+        padding: 12px 30px;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 500;
+        text-decoration: none;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+    
+    .btn-primary:hover {
+        background: #5568d3;
+        color: white;
+    }
+    
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+        padding: 12px 30px;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 500;
+        text-decoration: none;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+    
+    .btn-secondary:hover {
+        background: #5a6268;
+        color: white;
+    }
+    
+    @media (max-width: 480px) {
+        .already-answered-container {
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+        
+        .already-answered-card {
+            padding: 30px 20px;
+        }
+        
+        .action-buttons {
+            flex-direction: column;
+        }
+        
+        .action-buttons a {
+            width: 100%;
+            text-align: center;
+        }
+    }
+</style>
+{% endblock %}

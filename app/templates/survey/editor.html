@@ -1,0 +1,1845 @@
+{% extends "base.html" %}
+
+{% block title %}问卷编辑器 - {{ survey.title }}{% endblock %}
+
+{% block content %}
+<style>
+    .editor-container {
+        display: flex;
+        height: calc(100vh - 100px);
+        gap: 20px;
+    }
+    
+    .toolbar {
+        width: 280px;
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        overflow-y: auto;
+    }
+    
+    .toolbar h3 {
+        color: #333;
+        margin-bottom: 15px;
+        font-size: 1rem;
+    }
+    
+    .question-types {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .question-type-btn {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        background: #f8f9fa;
+        border: 2px solid #e1e5eb;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s;
+        text-align: left;
+    }
+    
+    .question-type-btn:hover {
+        border-color: #667eea;
+        background: rgba(102, 126, 234, 0.05);
+    }
+    
+    .question-type-btn .icon {
+        width: 36px;
+        height: 36px;
+        background: #667eea;
+        color: white;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        font-weight: bold;
+    }
+    
+    .question-type-btn .info {
+        flex: 1;
+    }
+    
+    .question-type-btn .name {
+        font-weight: 600;
+        color: #333;
+    }
+    
+    .question-type-btn .desc {
+        font-size: 0.8rem;
+        color: #666;
+    }
+    
+    .editor-main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        min-width: 0;
+    }
+    
+    .editor-header {
+        background: white;
+        border-radius: 10px;
+        padding: 15px 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .survey-title-input {
+        font-size: 1.25rem;
+        font-weight: 600;
+        border: none;
+        background: transparent;
+        color: #333;
+        outline: none;
+        padding: 5px 10px;
+        border-radius: 5px;
+        transition: background 0.3s;
+    }
+    
+    .survey-title-input:hover,
+    .survey-title-input:focus {
+        background: #f8f9fa;
+    }
+    
+    .editor-actions {
+        display: flex;
+        gap: 10px;
+    }
+    
+    .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.3s;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .btn-primary {
+        background: #667eea;
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background: #5568d3;
+    }
+    
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+    
+    .btn-secondary:hover {
+        background: #5a6268;
+    }
+    
+    .btn-success {
+        background: #28a745;
+        color: white;
+    }
+    
+    .btn-success:hover {
+        background: #218838;
+    }
+    
+    .questions-container {
+        flex: 1;
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        overflow-y: auto;
+    }
+    
+    .questions-container.empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #999;
+    }
+    
+    .empty-icon {
+        font-size: 4rem;
+        margin-bottom: 20px;
+        opacity: 0.5;
+    }
+    
+    .empty-text {
+        font-size: 1.1rem;
+        margin-bottom: 10px;
+    }
+    
+    .empty-hint {
+        font-size: 0.9rem;
+        color: #aaa;
+    }
+    
+    .question-item {
+        background: #f8f9fa;
+        border: 2px solid #e1e5eb;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        transition: all 0.3s;
+    }
+    
+    .question-item:hover {
+        border-color: #667eea;
+    }
+    
+    .question-item.selected {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+    }
+    
+    .question-header {
+        display: flex;
+        align-items: center;
+        padding: 15px;
+        cursor: pointer;
+    }
+    
+    .question-drag {
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #aaa;
+        cursor: grab;
+        font-size: 1.2rem;
+    }
+    
+    .question-order {
+        width: 30px;
+        height: 30px;
+        background: #667eea;
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 0.85rem;
+        margin-right: 12px;
+    }
+    
+    .question-content {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .question-text {
+        font-weight: 500;
+        color: #333;
+        margin-bottom: 4px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    
+    .question-meta {
+        font-size: 0.8rem;
+        color: #666;
+        display: flex;
+        gap: 10px;
+    }
+    
+    .question-type-badge {
+        background: #e1e5eb;
+        color: #666;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+    }
+    
+    .question-required {
+        color: #e74c3c;
+    }
+    
+    .question-actions {
+        display: flex;
+        gap: 8px;
+        margin-left: 10px;
+    }
+    
+    .question-action-btn {
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: transparent;
+        border-radius: 4px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #666;
+        transition: all 0.3s;
+    }
+    
+    .question-action-btn:hover {
+        background: rgba(102, 126, 234, 0.1);
+        color: #667eea;
+    }
+    
+    .question-action-btn.delete:hover {
+        background: rgba(231, 76, 60, 0.1);
+        color: #e74c3c;
+    }
+    
+    .properties-panel {
+        width: 320px;
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        overflow-y: auto;
+    }
+    
+    .properties-panel.empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #999;
+        text-align: center;
+    }
+    
+    .properties-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid #e1e5eb;
+    }
+    
+    .properties-header h3 {
+        color: #333;
+        font-size: 1rem;
+        margin: 0;
+    }
+    
+    .form-group {
+        margin-bottom: 18px;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 6px;
+        color: #333;
+        font-weight: 500;
+        font-size: 0.9rem;
+    }
+    
+    .form-group input[type="text"],
+    .form-group textarea,
+    .form-group select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 2px solid #e1e5eb;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        transition: border-color 0.3s;
+        box-sizing: border-box;
+    }
+    
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+    
+    .form-group textarea {
+        resize: vertical;
+        min-height: 80px;
+    }
+    
+    .form-group .hint {
+        font-size: 0.8rem;
+        color: #999;
+        margin-top: 4px;
+    }
+    
+    .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .checkbox-group input[type="checkbox"] {
+        width: auto;
+    }
+    
+    .options-editor {
+        margin-top: 10px;
+    }
+    
+    .option-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 8px;
+    }
+    
+    .option-item input {
+        flex: 1;
+    }
+    
+    .option-remove {
+        width: 28px;
+        height: 28px;
+        border: none;
+        background: #f8f9fa;
+        border-radius: 4px;
+        cursor: pointer;
+        color: #999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s;
+    }
+    
+    .option-remove:hover {
+        background: rgba(231, 76, 60, 0.1);
+        color: #e74c3c;
+    }
+    
+    .add-option-btn {
+        width: 100%;
+        padding: 8px;
+        border: 2px dashed #e1e5eb;
+        background: transparent;
+        border-radius: 6px;
+        color: #666;
+        cursor: pointer;
+        transition: all 0.3s;
+        font-size: 0.85rem;
+    }
+    
+    .add-option-btn:hover {
+        border-color: #667eea;
+        color: #667eea;
+    }
+    
+    .section-title {
+        font-size: 0.85rem;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin: 20px 0 12px 0;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .row {
+        display: flex;
+        gap: 12px;
+    }
+    
+    .col {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .loading {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.8);
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+    
+    .loading.show {
+        display: flex;
+    }
+    
+    .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid #e1e5eb;
+        border-top-color: #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    .toast {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        padding: 12px 20px;
+        border-radius: 8px;
+        color: white;
+        font-size: 0.9rem;
+        z-index: 1001;
+        transform: translateY(100px);
+        opacity: 0;
+        transition: all 0.3s;
+    }
+    
+    .toast.show {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    
+    .toast.success {
+        background: #28a745;
+    }
+    
+    .toast.error {
+        background: #e74c3c;
+    }
+
+    .question-type-btn[draggable="true"] {
+        cursor: grab;
+    }
+    
+    .question-type-btn[draggable="true"]:active {
+        cursor: grabbing;
+    }
+    
+    .question-type-btn.dragging {
+        opacity: 0.5;
+        transform: scale(1.02);
+    }
+    
+    .questions-container.drag-over {
+        background: rgba(102, 126, 234, 0.05);
+        border: 2px dashed #667eea;
+    }
+    
+    .question-item.dragging {
+        opacity: 0.4;
+        transform: scale(1.02);
+        z-index: 100;
+    }
+    
+    .question-item.drag-over-top {
+        border-top: 3px solid #667eea !important;
+    }
+    
+    .question-item.drag-over-bottom {
+        border-bottom: 3px solid #667eea !important;
+    }
+    
+    .drop-indicator {
+        height: 4px;
+        background: #667eea;
+        margin: 8px 0;
+        border-radius: 2px;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+    
+    .drop-indicator.show {
+        opacity: 1;
+    }
+    
+    .preview-section {
+        margin-top: 20px;
+        padding-top: 15px;
+        border-top: 1px solid #e1e5eb;
+    }
+    
+    .preview-section .section-title {
+        margin-top: 0;
+    }
+    
+    .question-preview {
+        background: #f8f9fa;
+        border: 1px solid #e1e5eb;
+        border-radius: 8px;
+        padding: 15px;
+    }
+    
+    .preview-question-text {
+        font-weight: 500;
+        color: #333;
+        margin-bottom: 12px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #e1e5eb;
+    }
+    
+    .preview-required {
+        color: #e74c3c;
+        margin-left: 4px;
+    }
+    
+    .preview-options {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .preview-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        background: white;
+        border: 1px solid #e1e5eb;
+        border-radius: 6px;
+        cursor: default;
+    }
+    
+    .preview-option input {
+        width: auto;
+        margin: 0;
+    }
+    
+    .preview-rating {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    
+    .preview-rating-item {
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: white;
+        border: 1px solid #e1e5eb;
+        border-radius: 6px;
+        cursor: default;
+        font-weight: 500;
+    }
+    
+    .preview-scale {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .preview-scale-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .preview-scale-label {
+        width: 100px;
+        flex-shrink: 0;
+        font-size: 0.85rem;
+        color: #666;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .preview-scale-options {
+        display: flex;
+        gap: 4px;
+        flex: 1;
+    }
+    
+    .preview-scale-option {
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: white;
+        border: 1px solid #e1e5eb;
+        border-radius: 4px;
+        cursor: default;
+        font-size: 0.8rem;
+    }
+    
+    .preview-scale-end-labels {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 5px;
+        font-size: 0.75rem;
+        color: #999;
+    }
+    
+    .preview-text-input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #e1e5eb;
+        border-radius: 6px;
+        background: white;
+        color: #999;
+        font-size: 0.9rem;
+    }
+    
+    .preview-text-input.long {
+        min-height: 80px;
+        resize: vertical;
+    }
+    
+    .preview-date-input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #e1e5eb;
+        border-radius: 6px;
+        background: white;
+        color: #999;
+        font-size: 0.9rem;
+    }
+    
+    .empty-question-text {
+        color: #999;
+        font-style: italic;
+    }
+</style>
+
+<div class="editor-container">
+    <div class="toolbar">
+        <h3>题目类型</h3>
+        <div class="question-types">
+            <div class="question-type-btn" data-type="single_choice" draggable="true">
+                <div class="icon">○</div>
+                <div class="info">
+                    <div class="name">单选题</div>
+                    <div class="desc">选择一个选项</div>
+                </div>
+            </div>
+            <div class="question-type-btn" data-type="multiple_choice" draggable="true">
+                <div class="icon">☐</div>
+                <div class="info">
+                    <div class="name">多选题</div>
+                    <div class="desc">选择多个选项</div>
+                </div>
+            </div>
+            <div class="question-type-btn" data-type="text" draggable="true">
+                <div class="icon">T</div>
+                <div class="info">
+                    <div class="name">填空题</div>
+                    <div class="desc">输入文字回答</div>
+                </div>
+            </div>
+            <div class="question-type-btn" data-type="rating" draggable="true">
+                <div class="icon">★</div>
+                <div class="info">
+                    <div class="name">评分题</div>
+                    <div class="desc">星级或数字评分</div>
+                </div>
+            </div>
+            <div class="question-type-btn" data-type="scale" draggable="true">
+                <div class="icon">〓</div>
+                <div class="info">
+                    <div class="name">量表题</div>
+                    <div class="desc">李克特量表评分</div>
+                </div>
+            </div>
+            <div class="question-type-btn" data-type="date" draggable="true">
+                <div class="icon">📅</div>
+                <div class="info">
+                    <div class="name">日期题</div>
+                    <div class="desc">选择日期或时间</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section-title">操作</div>
+        <button class="btn btn-secondary btn-block" onclick="window.location.href='{{ url_for('survey.list') }}'">
+            返回问卷列表
+        </button>
+    </div>
+    
+    <div class="editor-main">
+        <div class="editor-header">
+            <input type="text" class="survey-title-input" value="{{ survey.title }}" readonly>
+            <div class="editor-actions">
+                <button class="btn btn-secondary" onclick="previewSurvey()">预览</button>
+                <button class="btn btn-primary" onclick="saveAllQuestions()">保存</button>
+            </div>
+        </div>
+        
+        <div class="questions-container" id="questionsContainer">
+            <div class="empty">
+                <div class="empty-icon">📝</div>
+                <div class="empty-text">暂无题目</div>
+                <div class="empty-hint">从左侧工具栏拖拽题目类型或点击添加</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="properties-panel" id="propertiesPanel">
+        <div class="empty">
+            <div style="font-size: 3rem; margin-bottom: 15px; opacity: 0.3;">⚙️</div>
+            <div>请选择一个题目</div>
+            <div style="font-size: 0.85rem; color: #aaa; margin-top: 5px;">以编辑其属性</div>
+        </div>
+    </div>
+</div>
+
+<div class="loading" id="loadingOverlay">
+    <div class="loading-spinner"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const surveyId = {{ survey.id }};
+const apiBaseUrl = `/api/survey/${surveyId}`;
+
+let questions = [];
+let selectedQuestionId = null;
+
+const questionTypeNames = {
+    'single_choice': '单选题',
+    'multiple_choice': '多选题',
+    'text': '填空题',
+    'rating': '评分题',
+    'scale': '量表题',
+    'date': '日期题'
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadQuestions();
+    setupEventListeners();
+});
+
+function setupEventListeners() {
+    document.querySelectorAll('.question-type-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const type = this.dataset.type;
+            addQuestion(type);
+        });
+    });
+    
+    setupDragEvents();
+}
+
+async function loadQuestions() {
+    showLoading();
+    try {
+        const response = await fetch(`${apiBaseUrl}/questions`);
+        const data = await response.json();
+        
+        if (data.success) {
+            questions = data.questions;
+            renderQuestions();
+        } else {
+            showToast(data.message || '加载失败', 'error');
+        }
+    } catch (error) {
+        showToast('网络错误，请稍后重试', 'error');
+        console.error(error);
+    }
+    hideLoading();
+}
+
+function renderQuestions() {
+    const container = document.getElementById('questionsContainer');
+    
+    if (questions.length === 0) {
+        container.innerHTML = `
+            <div class="empty">
+                <div class="empty-icon">📝</div>
+                <div class="empty-text">暂无题目</div>
+                <div class="empty-hint">从左侧工具栏点击添加题目</div>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    questions.forEach((q, index) => {
+        const isSelected = selectedQuestionId === q.id;
+        html += `
+            <div class="question-item ${isSelected ? 'selected' : ''}" data-id="${q.id}" draggable="true">
+                <div class="question-header" onclick="selectQuestion(${q.id})">
+                    <div class="question-drag">⋮⋮</div>
+                    <div class="question-order">${index + 1}</div>
+                    <div class="question-content">
+                        <div class="question-text">${escapeHtml(q.text || '未命名题目')}</div>
+                        <div class="question-meta">
+                            <span class="question-type-badge">${questionTypeNames[q.type] || q.type}</span>
+                            ${q.is_required ? '<span class="question-required">* 必填</span>' : ''}
+                        </div>
+                    </div>
+                    <div class="question-actions">
+                        <button class="question-action-btn" onclick="event.stopPropagation(); moveQuestion(${q.id}, -1)" title="上移">↑</button>
+                        <button class="question-action-btn" onclick="event.stopPropagation(); moveQuestion(${q.id}, 1)" title="下移">↓</button>
+                        <button class="question-action-btn delete" onclick="event.stopPropagation(); deleteQuestion(${q.id})" title="删除">🗑</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+    setupDragEvents();
+}
+
+function selectQuestion(questionId) {
+    selectedQuestionId = questionId;
+    renderQuestions();
+    renderPropertiesPanel();
+}
+
+function renderPropertiesPanel() {
+    const panel = document.getElementById('propertiesPanel');
+    const question = questions.find(q => q.id === selectedQuestionId);
+    
+    if (!question) {
+        panel.innerHTML = `
+            <div class="empty">
+                <div style="font-size: 3rem; margin-bottom: 15px; opacity: 0.3;">⚙️</div>
+                <div>请选择一个题目</div>
+                <div style="font-size: 0.85rem; color: #aaa; margin-top: 5px;">以编辑其属性</div>
+            </div>
+        `;
+        return;
+    }
+    
+    const optionsHtml = renderOptionsEditor(question);
+    const previewHtml = renderQuestionPreview(question);
+    
+    panel.innerHTML = `
+        <div class="properties-header">
+            <h3>题目属性</h3>
+            <button class="question-action-btn" onclick="saveCurrentQuestion()">✓</button>
+        </div>
+        
+        <div class="form-group">
+            <label>题目类型</label>
+            <select id="prop_type" onchange="updateQuestionType(this.value)">
+                <option value="single_choice" ${question.type === 'single_choice' ? 'selected' : ''}>单选题</option>
+                <option value="multiple_choice" ${question.type === 'multiple_choice' ? 'selected' : ''}>多选题</option>
+                <option value="text" ${question.type === 'text' ? 'selected' : ''}>填空题</option>
+                <option value="rating" ${question.type === 'rating' ? 'selected' : ''}>评分题</option>
+                <option value="scale" ${question.type === 'scale' ? 'selected' : ''}>量表题</option>
+                <option value="date" ${question.type === 'date' ? 'selected' : ''}>日期题</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label>题目文本</label>
+            <textarea id="prop_text" placeholder="请输入题目内容">${escapeHtml(question.text || '')}</textarea>
+        </div>
+        
+        <div class="checkbox-group">
+            <input type="checkbox" id="prop_required" ${question.is_required ? 'checked' : ''}>
+            <label for="prop_required">必填</label>
+        </div>
+        
+        ${optionsHtml}
+        
+        <div class="section-title">高级设置</div>
+        <div class="form-group">
+            <label>排序</label>
+            <input type="number" id="prop_order" value="${question.order || 1}" min="1">
+        </div>
+        
+        ${previewHtml}
+    `;
+}
+
+function renderOptionsEditor(question) {
+    const options = question.options || {};
+    
+    if (question.type === 'single_choice' || question.type === 'multiple_choice') {
+        const opts = options.options || ['选项1', '选项2'];
+        let optionsHtml = opts.map((opt, i) => `
+            <div class="option-item">
+                <input type="text" value="${escapeHtml(opt)}" data-index="${i}" placeholder="选项${i + 1}">
+                <button class="option-remove" onclick="removeOption(${i})">-</button>
+            </div>
+        `).join('');
+        
+        let extraOptions = '';
+        if (question.type === 'multiple_choice') {
+            extraOptions = `
+                <div class="row">
+                    <div class="col">
+                        <div class="form-group">
+                            <label>最少选择</label>
+                            <input type="number" id="opt_min_choices" value="${options.min_choices || 1}" min="1">
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="form-group">
+                            <label>最多选择</label>
+                            <input type="number" id="opt_max_choices" value="${options.max_choices || opts.length}" min="1">
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        return `
+            <div class="section-title">选项设置</div>
+            <div class="options-editor" id="optionsEditor">
+                ${optionsHtml}
+            </div>
+            <button class="add-option-btn" onclick="addOption()">+ 添加选项</button>
+            ${extraOptions}
+            <div class="checkbox-group" style="margin-top: 12px;">
+                <input type="checkbox" id="opt_randomize" ${options.randomize ? 'checked' : ''}>
+                <label for="opt_randomize">随机选项顺序</label>
+            </div>
+        `;
+    }
+    
+    if (question.type === 'text') {
+        return `
+            <div class="section-title">输入设置</div>
+            <div class="form-group">
+                <label>输入类型</label>
+                <select id="opt_input_type">
+                    <option value="short" ${(options.input_type || 'short') === 'short' ? 'selected' : ''}>短文本</option>
+                    <option value="long" ${options.input_type === 'long' ? 'selected' : ''}>长文本</option>
+                </select>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <label>最大长度</label>
+                        <input type="number" id="opt_max_length" value="${options.max_length || 500}" min="1">
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>占位符</label>
+                <input type="text" id="opt_placeholder" value="${escapeHtml(options.placeholder || '')}" placeholder="请输入...">
+            </div>
+        `;
+    }
+    
+    if (question.type === 'rating') {
+        return `
+            <div class="section-title">评分设置</div>
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <label>最小值</label>
+                        <input type="number" id="opt_min_value" value="${options.min_value || 1}">
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="form-group">
+                        <label>最大值</label>
+                        <input type="number" id="opt_max_value" value="${options.max_value || 5}">
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>标签（用逗号分隔）</label>
+                <input type="text" id="opt_labels" value="${escapeHtml((options.labels || []).join(','))}" placeholder="非常差,差,一般,好,非常好">
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="opt_show_numbers" ${options.show_numbers !== false ? 'checked' : ''}>
+                <label for="opt_show_numbers">显示数字</label>
+            </div>
+        `;
+    }
+    
+    if (question.type === 'scale') {
+        return `
+            <div class="section-title">量表设置</div>
+            <div class="form-group">
+                <label>量表值（用逗号分隔）</label>
+                <input type="text" id="opt_scale_values" value="${escapeHtml((options.scale_values || [1, 2, 3, 4, 5]).join(','))}" placeholder="1,2,3,4,5">
+            </div>
+            <div class="form-group">
+                <label>量表标签（用逗号分隔）</label>
+                <input type="text" id="opt_scale_labels" value="${escapeHtml((options.scale_labels || ['非常不同意', '不同意', '中立', '同意', '非常同意']).join(','))}" placeholder="非常不同意,不同意,中立,同意,非常同意">
+            </div>
+            <div class="section-title">量表项目</div>
+            <div class="form-group">
+                <label>项目（每行一个）</label>
+                <textarea id="opt_items" placeholder="服务态度很好&#10;环境很整洁">${escapeHtml((options.items || []).map(i => i.text).join('\n'))}</textarea>
+            </div>
+        `;
+    }
+    
+    if (question.type === 'date') {
+        return `
+            <div class="section-title">日期设置</div>
+            <div class="form-group">
+                <label>日期类型</label>
+                <select id="opt_date_type">
+                    <option value="date" ${(options.date_type || 'date') === 'date' ? 'selected' : ''}>日期</option>
+                    <option value="datetime" ${options.date_type === 'datetime' ? 'selected' : ''}>日期时间</option>
+                    <option value="time" ${options.date_type === 'time' ? 'selected' : ''}>时间</option>
+                </select>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <label>最小日期</label>
+                        <input type="date" id="opt_min_date" value="${options.min_date || ''}">
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="form-group">
+                        <label>最大日期</label>
+                        <input type="date" id="opt_max_date" value="${options.max_date || ''}">
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    return '';
+}
+
+async function addQuestion(type) {
+    showLoading();
+    
+    const defaultTexts = {
+        'single_choice': '请选择一个选项',
+        'multiple_choice': '请选择多个选项',
+        'text': '请输入您的回答',
+        'rating': '请评分',
+        'scale': '请根据实际情况选择',
+        'date': '请选择日期'
+    };
+    
+    const defaultOptions = {
+        'single_choice': { options: ['选项A', '选项B', '选项C'], randomize: false },
+        'multiple_choice': { options: ['选项A', '选项B', '选项C'], min_choices: 1, max_choices: 3, randomize: false },
+        'text': { input_type: 'short', max_length: 500, placeholder: '请输入...' },
+        'rating': { min_value: 1, max_value: 5, labels: ['非常差', '差', '一般', '好', '非常好'], show_numbers: true },
+        'scale': { 
+            items: [
+                { id: 'item1', text: '服务态度很好' },
+                { id: 'item2', text: '环境很整洁' }
+            ],
+            scale_values: [1, 2, 3, 4, 5],
+            scale_labels: ['非常不同意', '不同意', '中立', '同意', '非常同意']
+        },
+        'date': { date_type: 'date', min_date: '', max_date: '' }
+    };
+    
+    try {
+        const response = await fetch(`${apiBaseUrl}/questions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: type,
+                text: defaultTexts[type],
+                options: defaultOptions[type],
+                is_required: true,
+                order: questions.length + 1
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            questions.push(data.question);
+            selectedQuestionId = data.question.id;
+            renderQuestions();
+            renderPropertiesPanel();
+            showToast('题目添加成功', 'success');
+        } else {
+            showToast(data.message || '添加失败', 'error');
+        }
+    } catch (error) {
+        showToast('网络错误，请稍后重试', 'error');
+        console.error(error);
+    }
+    hideLoading();
+}
+
+async function saveCurrentQuestion() {
+    if (!selectedQuestionId) return;
+    
+    const question = questions.find(q => q.id === selectedQuestionId);
+    if (!question) return;
+    
+    const text = document.getElementById('prop_text')?.value || '';
+    const isRequired = document.getElementById('prop_required')?.checked ?? true;
+    const order = parseInt(document.getElementById('prop_order')?.value || 1);
+    const options = collectOptions(question.type);
+    
+    showLoading();
+    try {
+        const response = await fetch(`${apiBaseUrl}/questions/${selectedQuestionId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: question.type,
+                text: text,
+                options: options,
+                is_required: isRequired,
+                order: order
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            const index = questions.findIndex(q => q.id === selectedQuestionId);
+            if (index !== -1) {
+                questions[index] = data.question;
+            }
+            renderQuestions();
+            showToast('保存成功', 'success');
+        } else {
+            showToast(data.message || '保存失败', 'error');
+        }
+    } catch (error) {
+        showToast('网络错误，请稍后重试', 'error');
+        console.error(error);
+    }
+    hideLoading();
+}
+
+function collectOptions(type) {
+    if (type === 'single_choice') {
+        const optionInputs = document.querySelectorAll('#optionsEditor input[type="text"]');
+        const options = Array.from(optionInputs).map(input => input.value).filter(v => v);
+        return {
+            options: options.length ? options : ['选项1'],
+            randomize: document.getElementById('opt_randomize')?.checked ?? false
+        };
+    }
+    
+    if (type === 'multiple_choice') {
+        const optionInputs = document.querySelectorAll('#optionsEditor input[type="text"]');
+        const options = Array.from(optionInputs).map(input => input.value).filter(v => v);
+        return {
+            options: options.length ? options : ['选项1'],
+            min_choices: parseInt(document.getElementById('opt_min_choices')?.value || 1),
+            max_choices: parseInt(document.getElementById('opt_max_choices')?.value || options.length || 1),
+            randomize: document.getElementById('opt_randomize')?.checked ?? false
+        };
+    }
+    
+    if (type === 'text') {
+        return {
+            input_type: document.getElementById('opt_input_type')?.value || 'short',
+            max_length: parseInt(document.getElementById('opt_max_length')?.value || 500),
+            placeholder: document.getElementById('opt_placeholder')?.value || ''
+        };
+    }
+    
+    if (type === 'rating') {
+        const labelsStr = document.getElementById('opt_labels')?.value || '';
+        const labels = labelsStr.split(',').map(s => s.trim()).filter(s => s);
+        return {
+            min_value: parseInt(document.getElementById('opt_min_value')?.value || 1),
+            max_value: parseInt(document.getElementById('opt_max_value')?.value || 5),
+            labels: labels.length ? labels : ['非常差', '差', '一般', '好', '非常好'],
+            show_numbers: document.getElementById('opt_show_numbers')?.checked !== false
+        };
+    }
+    
+    if (type === 'scale') {
+        const scaleValuesStr = document.getElementById('opt_scale_values')?.value || '1,2,3,4,5';
+        const scaleValues = scaleValuesStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+        
+        const scaleLabelsStr = document.getElementById('opt_scale_labels')?.value || '';
+        const scaleLabels = scaleLabelsStr.split(',').map(s => s.trim()).filter(s => s);
+        
+        const itemsStr = document.getElementById('opt_items')?.value || '';
+        const items = itemsStr.split('\n').map((text, idx) => ({
+            id: `item${idx + 1}`,
+            text: text.trim()
+        })).filter(item => item.text);
+        
+        return {
+            items: items.length ? items : [{ id: 'item1', text: '项目1' }],
+            scale_values: scaleValues.length ? scaleValues : [1, 2, 3, 4, 5],
+            scale_labels: scaleLabels.length ? scaleLabels : ['非常不同意', '不同意', '中立', '同意', '非常同意']
+        };
+    }
+    
+    if (type === 'date') {
+        return {
+            date_type: document.getElementById('opt_date_type')?.value || 'date',
+            min_date: document.getElementById('opt_min_date')?.value || '',
+            max_date: document.getElementById('opt_max_date')?.value || ''
+        };
+    }
+    
+    return {};
+}
+
+async function deleteQuestion(questionId) {
+    if (!confirm('确定要删除这道题目吗？')) return;
+    
+    showLoading();
+    try {
+        const response = await fetch(`${apiBaseUrl}/questions/${questionId}`, {
+            method: 'DELETE'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            questions = questions.filter(q => q.id !== questionId);
+            if (selectedQuestionId === questionId) {
+                selectedQuestionId = null;
+            }
+            questions.forEach((q, idx) => {
+                q.order = idx + 1;
+            });
+            renderQuestions();
+            renderPropertiesPanel();
+            showToast('删除成功', 'success');
+        } else {
+            showToast(data.message || '删除失败', 'error');
+        }
+    } catch (error) {
+        showToast('网络错误，请稍后重试', 'error');
+        console.error(error);
+    }
+    hideLoading();
+}
+
+async function moveQuestion(questionId, direction) {
+    const index = questions.findIndex(q => q.id === questionId);
+    if (index === -1) return;
+    
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= questions.length) return;
+    
+    const orderList = questions.map((q, idx) => {
+        if (idx === index) return questions[newIndex].id;
+        if (idx === newIndex) return questionId;
+        return q.id;
+    });
+    
+    showLoading();
+    try {
+        const response = await fetch(`${apiBaseUrl}/questions/reorder`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order: orderList })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            const temp = questions[index];
+            questions[index] = questions[newIndex];
+            questions[newIndex] = temp;
+            
+            questions.forEach((q, idx) => {
+                q.order = idx + 1;
+            });
+            
+            renderQuestions();
+        } else {
+            showToast(data.message || '移动失败', 'error');
+        }
+    } catch (error) {
+        showToast('网络错误，请稍后重试', 'error');
+        console.error(error);
+    }
+    hideLoading();
+}
+
+async function saveAllQuestions() {
+    showLoading();
+    try {
+        const response = await fetch(`${apiBaseUrl}/questions/batch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ questions: questions })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            questions = data.questions;
+            renderQuestions();
+            showToast('所有题目已保存', 'success');
+        } else {
+            showToast(data.message || '保存失败', 'error');
+        }
+    } catch (error) {
+        showToast('网络错误，请稍后重试', 'error');
+        console.error(error);
+    }
+    hideLoading();
+}
+
+function updateQuestionType(newType) {
+    if (!selectedQuestionId) return;
+    
+    const question = questions.find(q => q.id === selectedQuestionId);
+    if (!question) return;
+    
+    if (question.type === newType) return;
+    
+    if (!confirm(`切换题目类型将重置选项设置，确定要切换吗？`)) {
+        document.getElementById('prop_type').value = question.type;
+        return;
+    }
+    
+    question.type = newType;
+    
+    const defaultOptions = {
+        'single_choice': { options: ['选项A', '选项B', '选项C'], randomize: false },
+        'multiple_choice': { options: ['选项A', '选项B', '选项C'], min_choices: 1, max_choices: 3, randomize: false },
+        'text': { input_type: 'short', max_length: 500, placeholder: '请输入...' },
+        'rating': { min_value: 1, max_value: 5, labels: ['非常差', '差', '一般', '好', '非常好'], show_numbers: true },
+        'scale': { 
+            items: [{ id: 'item1', text: '项目1' }],
+            scale_values: [1, 2, 3, 4, 5],
+            scale_labels: ['非常不同意', '不同意', '中立', '同意', '非常同意']
+        },
+        'date': { date_type: 'date', min_date: '', max_date: '' }
+    };
+    
+    question.options = defaultOptions[newType] || {};
+    
+    renderPropertiesPanel();
+}
+
+function addOption() {
+    const editor = document.getElementById('optionsEditor');
+    if (!editor) return;
+    
+    const optionInputs = editor.querySelectorAll('input[type="text"]');
+    const newIndex = optionInputs.length;
+    
+    const newOption = document.createElement('div');
+    newOption.className = 'option-item';
+    newOption.innerHTML = `
+        <input type="text" value="" data-index="${newIndex}" placeholder="选项${newIndex + 1}">
+        <button class="option-remove" onclick="removeOption(${newIndex})">-</button>
+    `;
+    editor.appendChild(newOption);
+}
+
+function removeOption(index) {
+    const editor = document.getElementById('optionsEditor');
+    if (!editor) return;
+    
+    const optionInputs = editor.querySelectorAll('input[type="text"]');
+    if (optionInputs.length <= 1) {
+        showToast('至少需要一个选项', 'error');
+        return;
+    }
+    
+    const items = editor.querySelectorAll('.option-item');
+    if (items[index]) {
+        items[index].remove();
+        
+        const remainingItems = editor.querySelectorAll('.option-item');
+        remainingItems.forEach((item, idx) => {
+            const input = item.querySelector('input');
+            const btn = item.querySelector('.option-remove');
+            if (input) {
+                input.dataset.index = idx;
+                input.placeholder = `选项${idx + 1}`;
+            }
+            if (btn) {
+                btn.onclick = () => removeOption(idx);
+            }
+        });
+    }
+}
+
+function previewSurvey() {
+    showToast('预览功能开发中', 'info');
+}
+
+function showLoading() {
+    document.getElementById('loadingOverlay').classList.add('show');
+}
+
+function hideLoading() {
+    document.getElementById('loadingOverlay').classList.remove('show');
+}
+
+function showToast(message, type) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.className = `toast ${type} show`;
+    
+    setTimeout(() => {
+        toast.classList.remove('show');
+    }, 3000);
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+let draggedElement = null;
+let draggedQuestionId = null;
+let dragSourceType = null;
+
+function setupDragEvents() {
+    setupToolbarDragEvents();
+    setupQuestionListDragEvents();
+    setupDropZoneEvents();
+}
+
+function setupToolbarDragEvents() {
+    document.querySelectorAll('.question-type-btn[draggable="true"]').forEach(btn => {
+        btn.addEventListener('dragstart', function(e) {
+            draggedElement = this;
+            dragSourceType = 'toolbar';
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'copy';
+            e.dataTransfer.setData('text/plain', this.dataset.type);
+            e.dataTransfer.setData('application/json', JSON.stringify({
+                type: 'question_type',
+                questionType: this.dataset.type
+            }));
+        });
+        
+        btn.addEventListener('dragend', function(e) {
+            this.classList.remove('dragging');
+            draggedElement = null;
+            dragSourceType = null;
+        });
+    });
+}
+
+function setupQuestionListDragEvents() {
+    document.querySelectorAll('.question-item[draggable="true"]').forEach(item => {
+        item.addEventListener('dragstart', function(e) {
+            draggedElement = this;
+            draggedQuestionId = parseInt(this.dataset.id);
+            dragSourceType = 'question';
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', 'question_' + this.dataset.id);
+            e.dataTransfer.setData('application/json', JSON.stringify({
+                type: 'question',
+                questionId: parseInt(this.dataset.id)
+            }));
+        });
+        
+        item.addEventListener('dragend', function(e) {
+            this.classList.remove('dragging');
+            document.querySelectorAll('.question-item').forEach(q => {
+                q.classList.remove('drag-over-top', 'drag-over-bottom');
+            });
+            draggedElement = null;
+            draggedQuestionId = null;
+            dragSourceType = null;
+        });
+        
+        item.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            if (dragSourceType !== 'question') return;
+            if (draggedElement === this) return;
+            
+            e.dataTransfer.dropEffect = 'move';
+            
+            const rect = this.getBoundingClientRect();
+            const midY = rect.top + rect.height / 2;
+            const mouseY = e.clientY;
+            
+            document.querySelectorAll('.question-item').forEach(q => {
+                q.classList.remove('drag-over-top', 'drag-over-bottom');
+            });
+            
+            if (mouseY < midY) {
+                this.classList.add('drag-over-top');
+            } else {
+                this.classList.add('drag-over-bottom');
+            }
+        });
+        
+        item.addEventListener('dragleave', function(e) {
+            this.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+        
+        item.addEventListener('drop', async function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            this.classList.remove('drag-over-top', 'drag-over-bottom');
+            
+            if (dragSourceType !== 'question') return;
+            if (!draggedQuestionId) return;
+            
+            const targetQuestionId = parseInt(this.dataset.id);
+            if (draggedQuestionId === targetQuestionId) return;
+            
+            const rect = this.getBoundingClientRect();
+            const midY = rect.top + rect.height / 2;
+            const mouseY = e.clientY;
+            const insertBefore = mouseY < midY;
+            
+            await reorderQuestions(draggedQuestionId, targetQuestionId, insertBefore);
+        });
+    });
+}
+
+function setupDropZoneEvents() {
+    const container = document.getElementById('questionsContainer');
+    if (!container) return;
+    
+    container.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        
+        if (dragSourceType === 'toolbar') {
+            e.dataTransfer.dropEffect = 'copy';
+            this.classList.add('drag-over');
+        } else if (dragSourceType === 'question') {
+            e.dataTransfer.dropEffect = 'move';
+        }
+    });
+    
+    container.addEventListener('dragleave', function(e) {
+        this.classList.remove('drag-over');
+    });
+    
+    container.addEventListener('drop', async function(e) {
+        e.preventDefault();
+        this.classList.remove('drag-over');
+        
+        if (dragSourceType === 'toolbar') {
+            const data = e.dataTransfer.getData('application/json');
+            if (data) {
+                try {
+                    const json = JSON.parse(data);
+                    if (json.type === 'question_type') {
+                        await addQuestion(json.questionType);
+                    }
+                } catch (err) {
+                    const type = e.dataTransfer.getData('text/plain');
+                    if (type) {
+                        await addQuestion(type);
+                    }
+                }
+            }
+        }
+    });
+}
+
+async function reorderQuestions(draggedId, targetId, insertBefore) {
+    const draggedIndex = questions.findIndex(q => q.id === draggedId);
+    const targetIndex = questions.findIndex(q => q.id === targetId);
+    
+    if (draggedIndex === -1 || targetIndex === -1) return;
+    
+    const [draggedQuestion] = questions.splice(draggedIndex, 1);
+    
+    let newIndex;
+    if (insertBefore) {
+        newIndex = draggedIndex < targetIndex ? targetIndex - 1 : targetIndex;
+    } else {
+        newIndex = draggedIndex < targetIndex ? targetIndex : targetIndex + 1;
+    }
+    
+    questions.splice(newIndex, 0, draggedQuestion);
+    
+    questions.forEach((q, idx) => {
+        q.order = idx + 1;
+    });
+    
+    const orderList = questions.map(q => q.id);
+    
+    showLoading();
+    try {
+        const response = await fetch(`${apiBaseUrl}/questions/reorder`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order: orderList })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            renderQuestions();
+        } else {
+            showToast(data.message || '排序失败', 'error');
+            loadQuestions();
+        }
+    } catch (error) {
+        showToast('网络错误，请稍后重试', 'error');
+        console.error(error);
+        loadQuestions();
+    }
+    hideLoading();
+}
+
+function renderQuestionPreview(question) {
+    if (!question) return '';
+    
+    const options = question.options || {};
+    const questionText = question.text || '未命名题目';
+    
+    let previewContent = '';
+    
+    switch (question.type) {
+        case 'single_choice':
+            previewContent = renderSingleChoicePreview(options);
+            break;
+        case 'multiple_choice':
+            previewContent = renderMultipleChoicePreview(options);
+            break;
+        case 'text':
+            previewContent = renderTextPreview(options);
+            break;
+        case 'rating':
+            previewContent = renderRatingPreview(options);
+            break;
+        case 'scale':
+            previewContent = renderScalePreview(options);
+            break;
+        case 'date':
+            previewContent = renderDatePreview(options);
+            break;
+        default:
+            previewContent = '<div class="preview-text-input">此类型预览暂不支持</div>';
+    }
+    
+    return `
+        <div class="preview-section">
+            <div class="section-title">题目预览</div>
+            <div class="question-preview">
+                <div class="preview-question-text">
+                    ${escapeHtml(questionText)}
+                    ${question.is_required ? '<span class="preview-required">*</span>' : ''}
+                </div>
+                ${previewContent}
+            </div>
+        </div>
+    `;
+}
+
+function renderSingleChoicePreview(options) {
+    const opts = options.options || ['选项1', '选项2'];
+    if (opts.length === 0) opts.push('选项1');
+    
+    return `
+        <div class="preview-options">
+            ${opts.map((opt, i) => `
+                <div class="preview-option">
+                    <input type="radio" name="preview_radio_${Date.now()}" id="preview_radio_${i}">
+                    <label for="preview_radio_${i}">${escapeHtml(opt)}</label>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function renderMultipleChoicePreview(options) {
+    const opts = options.options || ['选项1', '选项2'];
+    if (opts.length === 0) opts.push('选项1');
+    
+    let extraInfo = '';
+    if (options.min_choices || options.max_choices) {
+        const min = options.min_choices || 1;
+        const max = options.max_choices || opts.length;
+        extraInfo = `<div style="font-size: 0.8rem; color: #999; margin-top: 8px;">可选 ${min}-${max} 项</div>`;
+    }
+    
+    return `
+        <div class="preview-options">
+            ${opts.map((opt, i) => `
+                <div class="preview-option">
+                    <input type="checkbox" id="preview_check_${i}">
+                    <label for="preview_check_${i}">${escapeHtml(opt)}</label>
+                </div>
+            `).join('')}
+        </div>
+        ${extraInfo}
+    `;
+}
+
+function renderTextPreview(options) {
+    const isLong = options.input_type === 'long';
+    const placeholder = options.placeholder || '请输入...';
+    
+    if (isLong) {
+        return `<textarea class="preview-text-input long" placeholder="${escapeHtml(placeholder)}" disabled></textarea>`;
+    }
+    return `<input type="text" class="preview-text-input" placeholder="${escapeHtml(placeholder)}" disabled>`;
+}
+
+function renderRatingPreview(options) {
+    const minValue = options.min_value || 1;
+    const maxValue = options.max_value || 5;
+    const labels = options.labels || [];
+    const showNumbers = options.show_numbers !== false;
+    
+    let items = [];
+    for (let i = minValue; i <= maxValue; i++) {
+        const label = labels[i - minValue] || (showNumbers ? String(i) : '★');
+        items.push(`<div class="preview-rating-item">${escapeHtml(label)}</div>`);
+    }
+    
+    return `<div class="preview-rating">${items.join('')}</div>`;
+}
+
+function renderScalePreview(options) {
+    const scaleValues = options.scale_values || [1, 2, 3, 4, 5];
+    const scaleLabels = options.scale_labels || ['非常不同意', '不同意', '中立', '同意', '非常同意'];
+    const items = options.items || [{ id: 'item1', text: '项目1' }];
+    
+    const scaleOptionsHtml = scaleValues.map((v, i) => `
+        <div class="preview-scale-option">${v}</div>
+    `).join('');
+    
+    const endLabelLeft = scaleLabels[0] || '';
+    const endLabelRight = scaleLabels[scaleLabels.length - 1] || '';
+    
+    const itemsHtml = items.slice(0, 3).map((item, i) => `
+        <div class="preview-scale-row">
+            <div class="preview-scale-label" title="${escapeHtml(item.text)}">${escapeHtml(item.text)}</div>
+            <div class="preview-scale-options">
+                ${scaleOptionsHtml}
+            </div>
+        </div>
+    `).join('');
+    
+    let moreItemsHint = '';
+    if (items.length > 3) {
+        moreItemsHint = `<div style="font-size: 0.8rem; color: #999; margin-top: 5px;">还有 ${items.length - 3} 个项目...</div>`;
+    }
+    
+    return `
+        <div class="preview-scale">
+            ${itemsHtml}
+            <div class="preview-scale-end-labels">
+                <span>${escapeHtml(endLabelLeft)}</span>
+                <span>${escapeHtml(endLabelRight)}</span>
+            </div>
+            ${moreItemsHint}
+        </div>
+    `;
+}
+
+function renderDatePreview(options) {
+    const dateType = options.date_type || 'date';
+    let inputType = 'date';
+    let placeholder = '请选择日期';
+    
+    if (dateType === 'datetime') {
+        inputType = 'datetime-local';
+        placeholder = '请选择日期时间';
+    } else if (dateType === 'time') {
+        inputType = 'time';
+        placeholder = '请选择时间';
+    }
+    
+    return `<input type="${inputType}" class="preview-date-input" placeholder="${placeholder}" disabled>`;
+}
+</script>
+{% endblock %}

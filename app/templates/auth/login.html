@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}登录 - Survey Platform{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="card">
+        <h2>用户登录</h2>
+        <form method="POST" action="">
+            {{ form.hidden_tag() }}
+            
+            <div class="form-group">
+                {{ form.username_or_email.label }}
+                {{ form.username_or_email(placeholder='请输入用户名或邮箱') }}
+                {% for error in form.username_or_email.errors %}
+                    <div class="error">{{ error }}</div>
+                {% endfor %}
+            </div>
+            
+            <div class="form-group">
+                {{ form.password.label }}
+                {{ form.password(placeholder='请输入密码') }}
+                {% for error in form.password.errors %}
+                    <div class="error">{{ error }}</div>
+                {% endfor %}
+            </div>
+            
+            <div class="form-group">
+                <div class="checkbox-group">
+                    {{ form.remember_me() }}
+                    {{ form.remember_me.label }}
+                </div>
+            </div>
+            
+            <div class="form-group">
+                {{ form.submit(class='btn btn-block') }}
+            </div>
+        </form>
+        
+        <div class="auth-footer">
+            还没有账号？<a href="{{ url_for('auth.register') }}">立即注册</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

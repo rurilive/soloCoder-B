@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+
+{% block title %}创建问卷 - Survey Platform{% endblock %}
+
+{% block content %}
+<style>
+    .form-container {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    .form-container h2 {
+        color: #333;
+        margin-bottom: 30px;
+    }
+    .form-section {
+        background: white;
+        border-radius: 10px;
+        padding: 30px;
+        margin-bottom: 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+    .form-section h3 {
+        color: #667eea;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #667eea;
+    }
+    .form-group {
+        margin-bottom: 20px;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        color: #333;
+        font-weight: 500;
+    }
+    .form-group input[type="text"],
+    .form-group input[type="password"],
+    .form-group input[type="number"],
+    .form-group input[type="datetime-local"],
+    .form-group textarea,
+    .form-group select {
+        width: 100%;
+        padding: 12px 15px;
+        border: 2px solid #e1e5eb;
+        border-radius: 5px;
+        font-size: 1rem;
+        transition: border-color 0.3s;
+    }
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+    .form-group textarea {
+        resize: vertical;
+        min-height: 100px;
+    }
+    .form-group .error {
+        color: #e74c3c;
+        font-size: 0.875rem;
+        margin-top: 5px;
+    }
+    .form-group .help-text {
+        color: #666;
+        font-size: 0.875rem;
+        margin-top: 5px;
+    }
+    .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .checkbox-group input[type="checkbox"] {
+        width: auto;
+    }
+    .form-actions {
+        display: flex;
+        gap: 15px;
+        justify-content: flex-end;
+    }
+    .btn {
+        padding: 12px 30px;
+        border: none;
+        border-radius: 5px;
+        font-size: 1rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.3s;
+        text-decoration: none;
+    }
+    .btn-primary {
+        background: #667eea;
+        color: white;
+    }
+    .btn-primary:hover {
+        background: #5568d3;
+    }
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+    .btn-secondary:hover {
+        background: #5a6268;
+    }
+    .row {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+    }
+    .col {
+        flex: 1;
+        min-width: 250px;
+    }
+</style>
+
+<div class="form-container">
+    <h2>创建新问卷</h2>
+    
+    <form method="POST" action="">
+        {{ form.hidden_tag() }}
+        
+        <div class="form-section">
+            <h3>基本信息</h3>
+            
+            <div class="form-group">
+                {{ form.title.label }}
+                {{ form.title(placeholder='请输入问卷标题') }}
+                {% for error in form.title.errors %}
+                    <div class="error">{{ error }}</div>
+                {% endfor %}
+            </div>
+            
+            <div class="form-group">
+                {{ form.description.label }}
+                {{ form.description(placeholder='请输入问卷描述（可选）') }}
+                {% for error in form.description.errors %}
+                    <div class="error">{{ error }}</div>
+                {% endfor %}
+            </div>
+            
+            <div class="form-group">
+                {{ form.status.label }}
+                {{ form.status() }}
+                <div class="help-text">选择问卷状态，草稿状态下他人无法访问</div>
+            </div>
+        </div>
+        
+        <div class="form-section">
+            <h3>时间限制</h3>
+            
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        {{ form.start_time.label }}
+                        {{ form.start_time(type='datetime-local') }}
+                        <div class="help-text">留空表示立即可用</div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="form-group">
+                        {{ form.end_time.label }}
+                        {{ form.end_time(type='datetime-local') }}
+                        <div class="help-text">留空表示无结束时间</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-section">
+            <h3>访问限制</h3>
+            
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        {{ form.access_password.label }}
+                        {{ form.access_password(placeholder='留空表示无需密码') }}
+                        <div class="help-text">设置后用户需要输入密码才能访问问卷</div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="form-group">
+                        {{ form.max_responses.label }}
+                        {{ form.max_responses(placeholder='不限制') }}
+                        <div class="help-text">最大回答数量，留空表示不限制</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            {{ form.require_login() }}
+                            {{ form.require_login.label }}
+                        </div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            {{ form.require_captcha() }}
+                            {{ form.require_captcha.label }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-section">
+            <h3>重复提交限制</h3>
+            
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        {{ form.limit_per_ip.label }}
+                        {{ form.limit_per_ip() }}
+                        <div class="help-text">0 表示不限制</div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            {{ form.limit_per_cookie() }}
+                            {{ form.limit_per_cookie.label }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <a href="{{ url_for('survey.list') }}" class="btn btn-secondary">取消</a>
+            {{ form.submit(class='btn btn-primary') }}
+        </div>
+    </form>
+</div>
+{% endblock %}

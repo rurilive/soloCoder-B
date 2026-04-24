@@ -1,0 +1,442 @@
+{% extends "base.html" %}
+
+{% block title %}问卷统计 - {{ survey.title }}{% endblock %}
+
+{% block content %}
+<style>
+    .stats-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    .stats-header h2 {
+        color: #333;
+    }
+    .back-link {
+        color: #667eea;
+        text-decoration: none;
+        font-size: 14px;
+    }
+    .back-link:hover {
+        text-decoration: underline;
+    }
+    .stats-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 10px;
+        padding: 20px;
+        color: white;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+    .stat-card.valid {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        box-shadow: 0 4px 15px rgba(17, 153, 142, 0.3);
+    }
+    .stat-card.invalid {
+        background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+        box-shadow: 0 4px 15px rgba(235, 51, 73, 0.3);
+    }
+    .stat-card.today {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        box-shadow: 0 4px 15px rgba(240, 147, 251, 0.3);
+    }
+    .stat-card-week {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        box-shadow: 0 4px 15px rgba(79, 172, 254, 0.3);
+    }
+    .stat-label {
+        font-size: 14px;
+        opacity: 0.9;
+        margin-bottom: 8px;
+    }
+    .stat-value {
+        font-size: 32px;
+        font-weight: bold;
+    }
+    .section-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #667eea;
+    }
+    .chart-container {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 30px;
+        min-height: 300px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #999;
+    }
+    .question-stat {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .question-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+    .question-title {
+        font-weight: 600;
+        color: #333;
+    }
+    .question-type {
+        font-size: 12px;
+        padding: 4px 10px;
+        background: #667eea;
+        color: white;
+        border-radius: 12px;
+    }
+    .option-bar {
+        margin-bottom: 10px;
+    }
+    .option-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 5px;
+    }
+    .option-label {
+        min-width: 100px;
+        font-size: 14px;
+        color: #666;
+    }
+    .option-bar-container {
+        flex: 1;
+        background: #e9ecef;
+        border-radius: 4px;
+        height: 24px;
+        overflow: hidden;
+    }
+    .option-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #667eea, #764ba2);
+        border-radius: 4px;
+        transition: width 0.5s ease;
+    }
+    .option-count {
+        min-width: 80px;
+        text-align: right;
+        font-size: 13px;
+        color: #666;
+    }
+    .rating-distribution, .scale-items {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .rating-item, .scale-item {
+        background: white;
+        border-radius: 6px;
+        padding: 15px;
+        min-width: 120px;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .rating-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #667eea;
+    }
+    .rating-count {
+        font-size: 12px;
+        color: #999;
+    }
+    .text-samples {
+        margin-top: 15px;
+    }
+    .text-sample {
+        background: white;
+        border-radius: 6px;
+        padding: 12px;
+        margin-bottom: 8px;
+        font-size: 14px;
+        color: #555;
+        border-left: 3px solid #667eea;
+    }
+    .word-frequency {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 15px;
+    }
+    .word-tag {
+        background: #e9ecef;
+        padding: 6px 12px;
+        border-radius: 16px;
+        font-size: 13px;
+        color: #555;
+    }
+    .word-tag strong {
+        color: #667eea;
+    }
+    .no-data {
+        text-align: center;
+        padding: 40px;
+        color: #999;
+        font-size: 14px;
+    }
+    .stats-summary {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+    .summary-item {
+        background: #f8f9fa;
+        padding: 12px 20px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .summary-label {
+        color: #666;
+        font-size: 14px;
+    }
+    .summary-value {
+        font-weight: bold;
+        color: #667eea;
+        font-size: 16px;
+    }
+</style>
+
+<div class="card">
+    <div class="stats-header">
+        <h2>问卷统计：{{ survey.title }}</h2>
+        <a href="{{ url_for('survey.list') }}" class="back-link">&larr; 返回问卷列表</a>
+    </div>
+    
+    <div class="stats-cards">
+        <div class="stat-card">
+            <div class="stat-label">总作答数</div>
+            <div class="stat-value">{{ stats.basic_stats.total_responses }}</div>
+        </div>
+        <div class="stat-card valid">
+            <div class="stat-label">有效作答</div>
+            <div class="stat-value">{{ stats.basic_stats.valid_responses }}</div>
+        </div>
+        <div class="stat-card invalid">
+            <div class="stat-label">无效作答</div>
+            <div class="stat-value">{{ stats.basic_stats.invalid_responses }}</div>
+        </div>
+        <div class="stat-card today">
+            <div class="stat-label">今日作答</div>
+            <div class="stat-value">{{ stats.basic_stats.responses_today }}</div>
+        </div>
+        <div class="stat-card stat-card-week">
+            <div class="stat-label">本周作答</div>
+            <div class="stat-value">{{ stats.basic_stats.responses_this_week }}</div>
+        </div>
+    </div>
+    
+    <div class="section-title">作答时间分布</div>
+    <div class="chart-container">
+        {% if stats.time_distribution %}
+        <div style="width: 100%;">
+            <div style="display: flex; gap: 5px; align-items: flex-end; height: 250px; padding: 20px;">
+                {% for item in stats.time_distribution %}
+                <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                    <div style="width: 100%; background: linear-gradient(180deg, #667eea, #764ba2); border-radius: 4px 4px 0 0; min-height: 4px; height: {{ (item.count / stats.time_distribution|map(attribute='count')|max * 200) if stats.time_distribution|map(attribute='count')|max > 0 else 0 }}px;"></div>
+                    <div style="font-size: 10px; color: #666; margin-top: 5px; text-align: center; word-break: break-all;">{{ item.time[-5:] if '-' in item.time else item.time }}</div>
+                    <div style="font-size: 12px; font-weight: bold; color: #667eea;">{{ item.count }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <div class="no-data">暂无作答数据</div>
+        {% endif %}
+    </div>
+    
+    <div class="section-title">题目统计详情</div>
+    
+    {% if stats.questions_stats %}
+        {% for qs in stats.questions_stats %}
+        <div class="question-stat">
+            <div class="question-header">
+                <span class="question-title">Q{{ loop.index }}. {{ qs.text }}</span>
+                <span class="question-type">
+                    {% if qs.type == 'single_choice' %}单选题
+                    {% elif qs.type == 'multiple_choice' %}多选题
+                    {% elif qs.type == 'rating' %}评分题
+                    {% elif qs.type == 'scale' %}量表题
+                    {% elif qs.type == 'text' %}填空题
+                    {% elif qs.type == 'date' %}日期题
+                    {% else %}{{ qs.type }}
+                    {% endif %}
+                    {% if qs.is_required %}*{% endif %}
+                </span>
+            </div>
+            
+            <div class="stats-summary">
+                <div class="summary-item">
+                    <span class="summary-label">作答数:</span>
+                    <span class="summary-value">{{ qs.response_count }}</span>
+                </div>
+            </div>
+            
+            {% if qs.response_count == 0 %}
+            <div class="no-data">暂无作答数据</div>
+            {% else %}
+            
+            {% if qs.type == 'single_choice' %}
+                {% for opt in qs.stats.options %}
+                <div class="option-bar">
+                    <div class="option-row">
+                        <span class="option-label">{{ opt.value[:15] }}{% if opt.value|length > 15 %}...{% endif %}</span>
+                        <div class="option-bar-container">
+                            <div class="option-bar-fill" style="width: {{ opt.percentage }}%;"></div>
+                        </div>
+                        <span class="option-count">{{ opt.count }} ({{ opt.percentage }}%)</span>
+                    </div>
+                </div>
+                {% endfor %}
+                
+            {% elif qs.type == 'multiple_choice' %}
+                <div class="stats-summary">
+                    <div class="summary-item">
+                        <span class="summary-label">总选择次数:</span>
+                        <span class="summary-value">{{ qs.stats.total_selections }}</span>
+                    </div>
+                </div>
+                {% for opt in qs.stats.options %}
+                <div class="option-bar">
+                    <div class="option-row">
+                        <span class="option-label">{{ opt.value[:15] }}{% if opt.value|length > 15 %}...{% endif %}</span>
+                        <div class="option-bar-container">
+                            <div class="option-bar-fill" style="width: {{ opt.percentage }}%;"></div>
+                        </div>
+                        <span class="option-count">{{ opt.count }} ({{ opt.percentage }}%)</span>
+                    </div>
+                </div>
+                {% endfor %}
+                
+                {% if qs.stats.selection_distribution %}
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #dee2e6;">
+                    <strong style="color: #666; font-size: 14px;">选择数量分布:</strong>
+                    <div style="display: flex; gap: 15px; margin-top: 10px; flex-wrap: wrap;">
+                        {% for sd in qs.stats.selection_distribution %}
+                        <div style="background: white; padding: 10px 15px; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
+                            <div style="font-size: 12px; color: #999;">选{{ sd.selections }}个</div>
+                            <div style="font-weight: bold; color: #667eea;">{{ sd.count }}人 ({{ sd.percentage }}%)</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                
+            {% elif qs.type == 'rating' %}
+                <div class="stats-summary">
+                    <div class="summary-item">
+                        <span class="summary-label">平均分:</span>
+                        <span class="summary-value">{{ qs.stats.average }}</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">中位数:</span>
+                        <span class="summary-value">{{ qs.stats.median if qs.stats.median else '-' }}</span>
+                    </div>
+                </div>
+                <div class="rating-distribution">
+                    {% for d in qs.stats.distribution %}
+                    <div class="rating-item">
+                        <div class="rating-value">{{ d.value }}</div>
+                        <div class="rating-count">{{ d.count }}人 ({{ d.percentage }}%)</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+            {% elif qs.type == 'scale' %}
+                <div class="stats-summary">
+                    <div class="summary-item">
+                        <span class="summary-label">整体平均分:</span>
+                        <span class="summary-value">{{ qs.stats.overall_average }}</span>
+                    </div>
+                </div>
+                {% for item in qs.stats.items %}
+                <div style="margin-bottom: 15px; padding: 15px; background: white; border-radius: 6px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <strong>{{ item.text }}</strong>
+                        <span style="color: #667eea; font-weight: bold;">平均分: {{ item.average }}</span>
+                    </div>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        {% for d in item.distribution %}
+                        <div style="background: #f8f9fa; padding: 6px 12px; border-radius: 4px; font-size: 12px;">
+                            {{ d.value }}分: {{ d.count }}人
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+                
+            {% elif qs.type == 'text' %}
+                {% if qs.stats.word_frequency %}
+                <div style="margin-bottom: 15px;">
+                    <strong style="color: #666; font-size: 14px;">高频词汇:</strong>
+                    <div class="word-frequency" style="margin-top: 10px;">
+                        {% for wf in qs.stats.word_frequency %}
+                        <span class="word-tag"><strong>{{ wf.word }}</strong> ({{ wf.count }})</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if qs.stats.sample_responses %}
+                <div class="text-samples">
+                    <strong style="color: #666; font-size: 14px;">回答示例:</strong>
+                    {% for sample in qs.stats.sample_responses %}
+                    <div class="text-sample">{{ sample }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                
+            {% elif qs.type == 'date' %}
+                {% if qs.stats.date_range.min %}
+                <div class="stats-summary">
+                    <div class="summary-item">
+                        <span class="summary-label">最早日期:</span>
+                        <span class="summary-value">{{ qs.stats.date_range.min }}</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">最晚日期:</span>
+                        <span class="summary-value">{{ qs.stats.date_range.max }}</span>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if qs.stats.distribution %}
+                <div style="margin-top: 10px;">
+                    <strong style="color: #666; font-size: 14px;">月份分布:</strong>
+                    <div style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;">
+                        {% for d in qs.stats.distribution %}
+                        <div style="background: white; padding: 10px 15px; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
+                            <div style="font-size: 12px; color: #999;">{{ d.month }}</div>
+                            <div style="font-weight: bold; color: #667eea;">{{ d.count }}人</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            {% endif %}
+            {% endif %}
+        </div>
+        {% endfor %}
+    {% else %}
+    <div class="no-data">该问卷暂无题目</div>
+    {% endif %}
+</div>
+{% endblock %}

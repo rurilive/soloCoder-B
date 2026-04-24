@@ -1431,6 +1431,19 @@ function addOption() {
     const editor = document.getElementById('optionsEditor');
     if (!editor) return;
     
+    const question = questions.find(q => q.id === selectedQuestionId);
+    if (!question) return;
+    
+    syncOptionsFromDOM(question);
+    
+    if (!question.options) {
+        question.options = {};
+    }
+    if (!question.options.options) {
+        question.options.options = [];
+    }
+    question.options.options.push('');
+    
     const optionInputs = editor.querySelectorAll('input[type="text"]');
     const newIndex = optionInputs.length;
     
@@ -1441,16 +1454,27 @@ function addOption() {
         <button class="option-remove" onclick="removeOption(${newIndex})">-</button>
     `;
     editor.appendChild(newOption);
+    
+    updatePreview();
 }
 
 function removeOption(index) {
     const editor = document.getElementById('optionsEditor');
     if (!editor) return;
     
+    const question = questions.find(q => q.id === selectedQuestionId);
+    if (!question) return;
+    
     const optionInputs = editor.querySelectorAll('input[type="text"]');
     if (optionInputs.length <= 1) {
         showToast('至少需要一个选项', 'error');
         return;
+    }
+    
+    syncOptionsFromDOM(question);
+    
+    if (question.options && question.options.options) {
+        question.options.options.splice(index, 1);
     }
     
     const items = editor.querySelectorAll('.option-item');
@@ -1469,6 +1493,47 @@ function removeOption(index) {
                 btn.onclick = () => removeOption(idx);
             }
         });
+    }
+    
+    updatePreview();
+}
+
+function syncOptionsFromDOM(question) {
+    if (!question) return;
+    
+    const editor = document.getElementById('optionsEditor');
+    if (!editor) return;
+    
+    const optionInputs = editor.querySelectorAll('input[type="text"]');
+    const options = Array.from(optionInputs).map(input => input.value);
+    
+    if (!question.options) {
+        question.options = {};
+    }
+    question.options.options = options.length ? options : ['选项1'];
+    
+    const randomizeCheckbox = document.getElementById('opt_randomize');
+    if (randomizeCheckbox) {
+        question.options.randomize = randomizeCheckbox.checked;
+    }
+}
+
+function updatePreview() {
+    const question = questions.find(q => q.id === selectedQuestionId);
+    if (!question) return;
+    
+    syncOptionsFromDOM(question);
+    
+    const previewSection = document.querySelector('.preview-section');
+    if (!previewSection) return;
+    
+    const newPreviewHtml = renderQuestionPreview(question);
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = newPreviewHtml;
+    const newPreviewSection = tempDiv.querySelector('.preview-section');
+    
+    if (newPreviewSection) {
+        previewSection.innerHTML = newPreviewSection.innerHTML;
     }
 }
 

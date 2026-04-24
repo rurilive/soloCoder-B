@@ -42,7 +42,12 @@ def create_app(config_name='default'):
             endpoint=request.endpoint
         )
         from flask import flash, redirect, url_for
-        flash('表单已过期，请重试', 'danger')
+        
+        if request.endpoint and 'access_password' in request.endpoint:
+            flash('您在页面停留时间过长，请刷新页面后重试', 'warning')
+            return redirect(request.url)
+        
+        flash('表单已过期，请刷新页面后重试', 'danger')
         return redirect(request.referrer or url_for('main.index'))
     
     @app.errorhandler(429)

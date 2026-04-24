@@ -364,16 +364,57 @@ def calculate_statistics_for_text(question, valid_answers):
     }
 
 
+def parse_date_value(value_str):
+    if value_str is None:
+        return None
+    value_str = str(value_str).strip()
+    if not value_str:
+        return None
+    
+    try:
+        parsed = json.loads(value_str)
+        if isinstance(parsed, str):
+            value_str = parsed.strip()
+            if not value_str:
+                return None
+    except (json.JSONDecodeError, ValueError, TypeError):
+        pass
+    
+    date_formats = [
+        '%Y-%m-%d',
+        '%Y/%m/%d',
+        '%d-%m-%Y',
+        '%d/%m/%Y',
+        '%Y-%m-%d %H:%M:%S',
+        '%Y-%m-%dT%H:%M:%S',
+        '%Y-%m-%dT%H:%M:%S.%f',
+        '%Y-%m-%d %H:%M',
+    ]
+    
+    for fmt in date_formats:
+        try:
+            dt = datetime.strptime(value_str, fmt)
+            return dt
+        except (ValueError, TypeError):
+            continue
+    
+    try:
+        from dateutil import parser
+        dt = parser.parse(value_str)
+        return dt
+    except (ImportError, ValueError, TypeError):
+        pass
+    
+    return None
+
+
 def calculate_statistics_for_date(question, valid_answers):
     dates = []
     
     for answer in valid_answers:
-        try:
-            if answer.value:
-                dt = datetime.strptime(answer.value, '%Y-%m-%d')
-                dates.append(dt)
-        except (ValueError, TypeError):
-            pass
+        dt = parse_date_value(answer.value)
+        if dt is not None:
+            dates.append(dt)
     
     if not dates:
         return {

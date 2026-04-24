@@ -1,0 +1,179 @@
+{% extends "admin/base.html" %}
+
+{% block title %}仪表盘 - 管理后台{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">仪表盘</h1>
+</div>
+
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            餐厅总数
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_restaurants }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-building fs-1 text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                            可用餐桌数
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_tables }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-table fs-1 text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                            待确认预订
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ pending_reservations|length }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-hourglass-split fs-1 text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                            今日预订
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ today_reservations|length }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-calendar-date fs-1 text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">待确认预订</h6>
+                <a href="{{ url_for('admin_reservations', status='pending') }}" class="text-decoration-none small">
+                    查看全部
+                </a>
+            </div>
+            <div class="card-body">
+                {% if pending_reservations %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>客户</th>
+                                <th>日期时间</th>
+                                <th>桌号</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for res in pending_reservations[:5] %}
+                            <tr>
+                                <td>{{ res.customer_name }}</td>
+                                <td>
+                                    {{ res.reservation_date }}<br>
+                                    <small class="text-muted">{{ res.start_time.strftime('%H:%M') }}</small>
+                                </td>
+                                <td>{{ res.table.table_number }}号</td>
+                                <td>
+                                    <form method="POST" action="{{ url_for('update_reservation_status', reservation_id=res.id) }}" class="d-inline">
+                                        <input type="hidden" name="status" value="confirmed">
+                                        <button type="submit" class="btn btn-sm btn-success">确认</button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('update_reservation_status', reservation_id=res.id) }}" class="d-inline">
+                                        <input type="hidden" name="status" value="cancelled">
+                                        <button type="submit" class="btn btn-sm btn-danger">取消</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-center text-muted py-4">暂无待确认预订</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">今日预订</h6>
+                <a href="{{ url_for('admin_reservations', date=today.isoformat()) }}" class="text-decoration-none small">
+                    查看全部
+                </a>
+            </div>
+            <div class="card-body">
+                {% if today_reservations %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>时间</th>
+                                <th>客户</th>
+                                <th>桌号</th>
+                                <th>状态</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for res in today_reservations %}
+                            <tr>
+                                <td>{{ res.start_time.strftime('%H:%M') }}</td>
+                                <td>{{ res.customer_name }}</td>
+                                <td>{{ res.table.table_number }}号</td>
+                                <td>
+                                    <span class="badge bg-{{ res.status_class }}">
+                                        {{ res.status_display }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-center text-muted py-4">今日暂无预订</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

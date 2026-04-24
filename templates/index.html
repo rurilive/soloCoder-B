@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}餐厅预定系统 - 首页{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-lg-8 text-center">
+        <h1 class="display-4 mb-4">🍽️ 餐厅预定系统</h1>
+        <p class="lead mb-5">轻松预订您喜爱的餐厅，享受美味时光</p>
+    </div>
+</div>
+
+<div class="row">
+    {% for restaurant in restaurants %}
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title">{{ restaurant.name }}</h5>
+                <p class="card-text text-muted small mb-2">
+                    <strong>营业时间：</strong>{{ restaurant.open_time.strftime('%H:%M') }} - {{ restaurant.close_time.strftime('%H:%M') }}
+                </p>
+                {% if restaurant.address %}
+                <p class="card-text text-muted small mb-2">
+                    <strong>地址：</strong>{{ restaurant.address }}
+                </p>
+                {% endif %}
+                {% if restaurant.phone %}
+                <p class="card-text text-muted small mb-2">
+                    <strong>电话：</strong>{{ restaurant.phone }}
+                </p>
+                {% endif %}
+                {% if restaurant.description %}
+                <p class="card-text">{{ restaurant.description }}</p>
+                {% endif %}
+            </div>
+            <div class="card-footer bg-transparent">
+                <a href="{{ url_for('check_availability', restaurant_id=restaurant.id) }}" class="btn btn-primary w-100">
+                    查看可用餐位并预订
+                </a>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12 text-center py-5">
+        <p class="text-muted">暂无餐厅信息，请联系管理员添加。</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

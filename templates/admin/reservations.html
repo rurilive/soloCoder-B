@@ -1,0 +1,213 @@
+{% extends "admin/base.html" %}
+
+{% block title %}预订列表 - 管理后台{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">预订列表</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('admin_calendar') }}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-calendar3"></i> 日历视图
+        </a>
+    </div>
+</div>
+
+<div class="card shadow mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">餐厅</label>
+                <select class="form-select" name="restaurant_id">
+                    <option value="">全部餐厅</option>
+                    {% for restaurant in restaurants %}
+                    <option value="{{ restaurant.id }}" 
+                            {% if request.args.get('restaurant_id')|int == restaurant.id %}selected{% endif %}>
+                        {{ restaurant.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">状态</label>
+                <select class="form-select" name="status">
+                    <option value="">全部状态</option>
+                    <option value="pending" {% if request.args.get('status') == 'pending' %}selected{% endif %}>待确认</option>
+                    <option value="confirmed" {% if request.args.get('status') == 'confirmed' %}selected{% endif %}>已确认</option>
+                    <option value="cancelled" {% if request.args.get('status') == 'cancelled' %}selected{% endif %}>已取消</option>
+                    <option value="completed" {% if request.args.get('status') == 'completed' %}selected{% endif %}>已完成</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">日期</label>
+                <input type="date" class="form-control" name="date" 
+                       value="{{ request.args.get('date', today.isoformat()) }}">
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search"></i> 筛选
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if reservations %}
+<div class="card shadow">
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead class="table-light">
+                <tr>
+                    <th>预订日期</th>
+                    <th>时间</th>
+                    <th>客户信息</th>
+                    <th>餐厅/桌号</th>
+                    <th>人数</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for res in reservations %}
+                <tr>
+                    <td>{{ res.reservation_date }}</td>
+                    <td>{{ res.start_time.strftime('%H:%M') }} - {{ res.end_time.strftime('%H:%M') }}</td>
+                    <td>
+                        <strong>{{ res.customer_name }}</strong><br>
+                        <small class="text-muted">{{ res.customer_phone }}</small>
+                        {% if res.customer_email %}
+                        <br><small class="text-muted">{{ res.customer_email }}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {{ res.table.restaurant.name }}<br>
+                        <strong>{{ res.table.table_number }} 号桌</strong>
+                    </td>
+                    <td>{{ res.guest_count }} 人</td>
+                    <td>
+                        <span class="badge bg-{{ res.status_class }}">
+                            {{ res.status_display }}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            {% if res.status == 'pending' %}
+                            <form method="POST" action="{{ url_for('update_reservation_status', reservation_id=res.id) }}" class="d-inline">
+                                <input type="hidden" name="status" value="confirmed">
+                                <button type="submit" class="btn btn-success" title="确认">
+                                    <i class="bi bi-check-lg"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                            {% if res.status not in ['cancelled', 'completed'] %}
+                            <form method="POST" action="{{ url_for('update_reservation_status', reservation_id=res.id) }}" class="d-inline">
+                                <input type="hidden" name="status" value="cancelled">
+                                <button type="submit" class="btn btn-danger" title="取消">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                            {% if res.status == 'confirmed' %}
+                            <form method="POST" action="{{ url_for('update_reservation_status', reservation_id=res.id) }}" class="d-inline">
+                                <input type="hidden" name="status" value="completed">
+                                <button type="submit" class="btn btn-secondary" title="标记完成">
+                                    <i class="bi bi-check2-all"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                        
+                        <button type="button" class="btn btn-sm btn-outline-info" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#detailModal{{ res.id }}">
+                            <i class="bi bi-info-circle"></i>
+                        </button>
+                        
+                        <div class="modal fade" id="detailModal{{ res.id }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">预订详情</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <table class="table table-borderless table-sm">
+                                            <tr>
+                                                <td class="text-muted">预订编号</td>
+                                                <td><strong>#{{ res.id }}</strong></td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">餐厅</td>
+                                                <td>{{ res.table.restaurant.name }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">桌号</td>
+                                                <td>{{ res.table.table_number }} 号桌</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">日期</td>
+                                                <td>{{ res.reservation_date }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">时间</td>
+                                                <td>{{ res.start_time.strftime('%H:%M') }} - {{ res.end_time.strftime('%H:%M') }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">客户姓名</td>
+                                                <td>{{ res.customer_name }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">联系电话</td>
+                                                <td>{{ res.customer_phone }}</td>
+                                            </tr>
+                                            {% if res.customer_email %}
+                                            <tr>
+                                                <td class="text-muted">电子邮箱</td>
+                                                <td>{{ res.customer_email }}</td>
+                                            </tr>
+                                            {% endif %}
+                                            <tr>
+                                                <td class="text-muted">用餐人数</td>
+                                                <td>{{ res.guest_count }} 人</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">当前状态</td>
+                                                <td>
+                                                    <span class="badge bg-{{ res.status_class }}">
+                                                        {{ res.status_display }}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            {% if res.notes %}
+                                            <tr>
+                                                <td class="text-muted">备注</td>
+                                                <td>{{ res.notes }}</td>
+                                            </tr>
+                                            {% endif %}
+                                            <tr>
+                                                <td class="text-muted">创建时间</td>
+                                                <td>{{ res.created_at.strftime('%Y-%m-%d %H:%M') if res.created_at else '-' }}</td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="card shadow">
+    <div class="card-body text-center py-5">
+        <i class="bi bi-calendar-x fs-1 text-muted"></i>
+        <p class="mt-3 text-muted">暂无预订记录</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

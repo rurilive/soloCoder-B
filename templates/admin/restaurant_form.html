@@ -1,0 +1,75 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{% if restaurant %}编辑餐厅{% else %}添加餐厅{% endif %} - 管理后台{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        {% if restaurant %}
+        编辑餐厅
+        {% else %}
+        添加餐厅
+        {% endif %}
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('admin_restaurants') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> 返回列表
+        </a>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">餐厅名称 *</label>
+                        <input type="text" class="form-control" id="name" name="name" required
+                               value="{{ restaurant.name if restaurant else '' }}">
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="open_time" class="form-label">开门时间 *</label>
+                            <input type="time" class="form-control" id="open_time" name="open_time" required
+                                   value="{{ restaurant.open_time.strftime('%H:%M') if restaurant else '10:00' }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="close_time" class="form-label">关门时间 *</label>
+                            <input type="time" class="form-control" id="close_time" name="close_time" required
+                                   value="{{ restaurant.close_time.strftime('%H:%M') if restaurant else '22:00' }}">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="address" class="form-label">地址</label>
+                        <input type="text" class="form-control" id="address" name="address"
+                               value="{{ restaurant.address if restaurant else '' }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="phone" class="form-label">联系电话</label>
+                        <input type="tel" class="form-control" id="phone" name="phone"
+                               value="{{ restaurant.phone if restaurant else '' }}">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="description" class="form-label">餐厅描述</label>
+                        <textarea class="form-control" id="description" name="description" rows="3">{{ restaurant.description if restaurant else '' }}</textarea>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('admin_restaurants') }}" class="btn btn-secondary">
+                            取消
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            {% if restaurant %}保存修改{% else %}添加餐厅{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

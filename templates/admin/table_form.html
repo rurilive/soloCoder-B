@@ -1,0 +1,86 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{% if table %}编辑餐桌{% else %}添加餐桌{% endif %} - 管理后台{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        {% if table %}
+        编辑餐桌
+        {% else %}
+        添加餐桌
+        {% endif %}
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('admin_tables') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> 返回列表
+        </a>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card shadow">
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="restaurant_id" class="form-label">所属餐厅 *</label>
+                        <select class="form-select" id="restaurant_id" name="restaurant_id" required>
+                            <option value="">请选择餐厅</option>
+                            {% for restaurant in restaurants %}
+                            <option value="{{ restaurant.id }}" 
+                                    {% if table and table.restaurant_id == restaurant.id %}selected{% endif %}>
+                                {{ restaurant.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="table_number" class="form-label">桌号 *</label>
+                            <input type="number" class="form-control" id="table_number" name="table_number" 
+                                   min="1" required
+                                   value="{{ table.table_number if table else '' }}">
+                            <div class="form-text">例如：1, 2, 3 等</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="capacity" class="form-label">可容纳人数 *</label>
+                            <select class="form-select" id="capacity" name="capacity" required>
+                                {% for i in range(1, 21) %}
+                                <option value="{{ i }}" 
+                                        {% if table and table.capacity == i %}selected{% endif %}>
+                                    {{ i }} 人
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    {% if table %}
+                    <div class="mb-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="is_active" name="is_active"
+                                   {% if table.is_active %}checked{% endif %}>
+                            <label class="form-check-label" for="is_active">
+                                启用该餐桌
+                            </label>
+                        </div>
+                        <div class="form-text">取消勾选后，用户将无法预订该餐桌</div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('admin_tables') }}" class="btn btn-secondary">
+                            取消
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            {% if table %}保存修改{% else %}添加餐桌{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

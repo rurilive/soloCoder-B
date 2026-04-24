@@ -1,0 +1,146 @@
+{% extends "admin/base.html" %}
+
+{% block title %}日历视图 - 管理后台{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+<style>
+    .fc-event {
+        cursor: pointer;
+    }
+    .fc-day-today {
+        background-color: rgba(13, 110, 253, 0.05) !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">日历视图</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('admin_reservations') }}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-list"></i> 列表视图
+        </a>
+    </div>
+</div>
+
+<div class="card shadow">
+    <div class="card-header py-3">
+        <div class="row align-items-center">
+            <div class="col">
+                <div class="d-flex align-items-center">
+                    <span class="badge bg-warning me-2"></span> 待确认
+                    <span class="badge bg-success mx-2"></span> 已确认
+                    <span class="badge bg-danger mx-2"></span> 已取消
+                    <span class="badge bg-secondary ms-2"></span> 已完成
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div id="calendar"></div>
+    </div>
+</div>
+
+<div class="modal fade" id="eventModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="eventModalTitle">预订详情</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="eventModalBody">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/locales/zh-cn.global.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const calendarEl = document.getElementById('calendar');
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+        locale: 'zh-cn',
+        initialView: 'dayGridMonth',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,timeGridDay'
+        },
+        buttonText: {
+            today: '今天',
+            month: '月',
+            week: '周',
+            day: '日'
+        },
+        events: function(fetchInfo, successCallback, failureCallback) {
+            fetch(`/admin/calendar/data?start=${fetchInfo.startStr}&end=${fetchInfo.endStr}`)
+                .then(response => response.json())
+                .then(events => successCallback(events))
+                .catch(error => failureCallback(error));
+        },
+        eventClick: function(info) {
+            const event = info.event;
+            const props = event.extendedProps;
+            
+            let statusBadge = '';
+            switch(props.status) {
+                case 'pending':
+                    statusBadge = '<span class="badge bg-warning">待确认</span>';
+                    break;
+                case 'confirmed':
+                    statusBadge = '<span class="badge bg-success">已确认</span>';
+                    break;
+                case 'cancelled':
+                    statusBadge = '<span class="badge bg-danger">已取消</span>';
+                    break;
+                case 'completed':
+                    statusBadge = '<span class="badge bg-secondary">已完成</span>';
+                    break;
+            }
+            
+            const modalBody = document.getElementById('eventModalBody');
+            modalBody.innerHTML = `
+                <table class="table table-borderless table-sm">
+                    <tr>
+                        <td class="text-muted">预订编号</td>
+                        <td><strong>#${event.id}</strong></td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">桌号</td>
+                        <td>${props.table_number} 号桌</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">用餐人数</td>
+                        <td>${props.guest_count} 人</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">联系电话</td>
+                        <td>${props.phone || '-'}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">状态</td>
+                        <td>${statusBadge}</td>
+                    </tr>
+                    ${props.notes ? `<tr><td class="text-muted">备注</td><td>${props.notes}</td></tr>` : ''}
+                </table>
+            `;
+            
+            const modal = new bootstrap.Modal(document.getElementById('eventModal'));
+            modal.show();
+        },
+        eventDidMount: function(info) {
+            info.el.style.borderRadius = '4px';
+        }
+    });
+    
+    calendar.render();
+});
+</script>
+{% endblock %}

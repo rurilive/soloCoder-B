@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}预订成功{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-lg-6">
+        <div class="card shadow">
+            <div class="card-header bg-success text-white text-center py-4">
+                <h3 class="mb-0">🎉 预订成功！</h3>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-success">
+                    <p class="mb-0">您的预订已提交成功，我们将尽快与您确认。</p>
+                </div>
+                
+                <h5 class="mb-3">预订详情</h5>
+                <table class="table table-borderless">
+                    <tr>
+                        <td class="text-muted">餐厅</td>
+                        <td><strong>{{ restaurant.name }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">桌号</td>
+                        <td><strong>{{ reservation.table.table_number }} 号桌</strong></td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">日期</td>
+                        <td><strong>{{ reservation.reservation_date }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">时间</td>
+                        <td><strong>{{ reservation.start_time.strftime('%H:%M') }} - {{ reservation.end_time.strftime('%H:%M') }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">用餐人数</td>
+                        <td><strong>{{ reservation.guest_count }} 人</strong></td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">预订状态</td>
+                        <td>
+                            <span class="badge bg-warning">
+                                {{ reservation.status_display }}
+                            </span>
+                        </td>
+                    </tr>
+                </table>
+                
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('index') }}" class="btn btn-primary">
+                        返回首页
+                    </a>
+                    <a href="{{ url_for('check_availability', restaurant_id=restaurant.id) }}" class="btn btn-outline-primary">
+                        继续预订其他时段
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}{{ restaurant.name }} - 检查可用餐位{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-lg-6">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">{{ restaurant.name }}</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="reservation_date" class="form-label">选择日期</label>
+                        <input type="date" class="form-control" id="reservation_date" 
+                               name="reservation_date" required
+                               min="{{ today.isoformat() }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="start_time" class="form-label">选择时间</label>
+                        <select class="form-select" id="start_time" name="start_time" required>
+                            <option value="">请选择时间</option>
+                            {% for time_slot in time_slots %}
+                            <option value="{{ time_slot.strftime('%H:%M') }}">
+                                {{ time_slot.strftime('%H:%M') }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="guest_count" class="form-label">用餐人数</label>
+                        <select class="form-select" id="guest_count" name="guest_count" required>
+                            {% for i in range(1, 13) %}
+                            <option value="{{ i }}">{{ i }} 人</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            查看可用餐位
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="card-footer text-center">
+                <a href="{{ url_for('index') }}" class="text-decoration-none">返回首页</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('reservation_date').value = today;
+});
+</script>
+{% endblock %}

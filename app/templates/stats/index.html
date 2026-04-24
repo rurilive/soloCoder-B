@@ -217,7 +217,15 @@
 
 <div class="card">
     <div class="stats-header">
-        <h2>问卷统计：{{ survey.title }}</h2>
+        <div>
+            <h2>问卷统计：{{ survey.title }}</h2>
+            <div style="margin-top: 10px;">
+                <span class="link-preview" id="statsLink">{{ url_for('stats.view_stats', survey_id=survey.id, _external=True) }}</span>
+                <button type="button" class="btn-copy" onclick="copyStatsLink()">复制统计页链接</button>
+                <span class="link-preview" id="surveyLink" style="margin-left: 15px;">{{ url_for('response.take_survey', survey_id=survey.id, _external=True) }}</span>
+                <button type="button" class="btn-copy" onclick="copySurveyTakeLink()">复制问卷链接</button>
+            </div>
+        </div>
         <a href="{{ url_for('survey.list') }}" class="back-link">&larr; 返回问卷列表</a>
     </div>
     
@@ -439,4 +447,16 @@
     <div class="no-data">该问卷暂无题目</div>
     {% endif %}
 </div>
+
+<script>
+function copyStatsLink() {
+    const link = document.getElementById('statsLink').textContent;
+    copyToClipboard(link, `统计页链接已复制: ${link}`);
+}
+
+function copySurveyTakeLink() {
+    const link = document.getElementById('surveyLink').textContent;
+    copyToClipboard(link, `问卷链接已复制: ${link}`);
+}
+</script>
 {% endblock %}

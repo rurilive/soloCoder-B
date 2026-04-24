@@ -212,6 +212,87 @@
         .auth-footer a:hover {
             text-decoration: underline;
         }
+        
+        .toast-notification {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            padding: 16px 24px;
+            background: #28a745;
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 9999;
+            animation: toastIn 0.3s ease;
+            max-width: 400px;
+            word-break: break-all;
+        }
+        
+        .toast-notification.error {
+            background: #e74c3c;
+        }
+        
+        .toast-notification.info {
+            background: #17a2b8;
+        }
+        
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateX(100px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        @keyframes toastOut {
+            from {
+                opacity: 1;
+                transform: translateX(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateX(100px);
+            }
+        }
+        
+        .btn-copy {
+            background: #20c997;
+            color: white;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.3s;
+        }
+        
+        .btn-copy:hover {
+            background: #1aa67a;
+        }
+        
+        .btn-copy:active {
+            background: #0f6646;
+        }
+        
+        .link-preview {
+            font-family: monospace;
+            background: #f8f9fa;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #e1e5eb;
+            font-size: 0.85rem;
+            color: #666;
+            word-break: break-all;
+            margin-right: 8px 0;
+            display: inline-block;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
@@ -249,5 +330,55 @@
             {% block content %}{% endblock %}
         </div>
     </main>
+    
+    <script>
+        function showToast(message, type = 'success') {
+            const existingToast = document.querySelector('.toast-notification');
+            if (existingToast) {
+                existingToast.remove();
+            }
+            
+            const toast = document.createElement('div');
+            toast.className = `toast-notification ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'toastOut 0.3s ease forwards';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+        
+        async function copyToClipboard(text, successMessage = null) {
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(text);
+                    const msg = successMessage || `已复制: ${text}`;
+                    showToast(msg, 'success');
+                    return true;
+                } else {
+                    const textArea = document.createElement('textarea');
+                    textArea.value = text;
+                    textArea.style.position = 'fixed';
+                    textArea.style.opacity = '0';
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    const msg = successMessage || `已复制: ${text}`;
+                    showToast(msg, 'success');
+                    return true;
+                }
+            } catch (err) {
+                console.error('复制失败:', err);
+                showToast('复制失败，请手动复制', 'error');
+                return false;
+            }
+        }
+        
+        async function copyCurrentUrl(successMessage = null) {
+            return copyToClipboard(window.location.href, successMessage);
+        }
+    </script>
 </body>
 </html>

@@ -192,6 +192,8 @@
                     {% if item.survey.description %}
                     <br><small style="color: #666;">{{ item.survey.description[:50] }}{% if item.survey.description|length > 50 %}...{% endif %}</small>
                     {% endif %}
+                    <br><span class="link-preview" id="link-{{ item.survey.id }}">{{ url_for('response.take_survey', survey_id=item.survey.id, _external=True) }}</span>
+                    <button type="button" class="btn-copy" onclick="copySurveyLink({{ item.survey.id }})">复制链接</button>
                 </td>
                 <td>
                     <span class="status-badge {{ item.status_badge }}">{{ item.status_label }}</span>
@@ -228,4 +230,14 @@
     </div>
     {% endif %}
 </div>
+
+<script>
+function copySurveyLink(surveyId) {
+    const linkElement = document.getElementById('link-' + surveyId);
+    if (linkElement) {
+        const link = linkElement.textContent;
+        copyToClipboard(link, `问卷链接已复制: ${link}`);
+    }
+}
+</script>
 {% endblock %}

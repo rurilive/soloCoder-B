@@ -105,7 +105,8 @@ def calculate_statistics_for_single_choice(question, valid_answers):
     options = question.get_options_list()
     total_responses = len(valid_answers)
     
-    option_counts = {opt: 0 for opt in options}
+    option_counts = {str(opt): 0 for opt in options}
+    original_options = {str(opt): opt for opt in options}
     
     for answer in valid_answers:
         value = answer.value
@@ -114,7 +115,7 @@ def calculate_statistics_for_single_choice(question, valid_answers):
     
     result_options = []
     for opt in options:
-        count = option_counts[opt]
+        count = option_counts[str(opt)]
         result_options.append({
             'value': opt,
             'count': count,
@@ -133,7 +134,7 @@ def calculate_statistics_for_multiple_choice(question, valid_answers):
     options = question.get_options_list()
     total_responses = len(valid_answers)
     
-    option_counts = {opt: 0 for opt in options}
+    option_counts = {str(opt): 0 for opt in options}
     selection_counts = []
     total_selections = 0
     
@@ -146,14 +147,15 @@ def calculate_statistics_for_multiple_choice(question, valid_answers):
                     selection_counts.append(selection_count)
                     total_selections += selection_count
                     for opt in value:
-                        if opt in option_counts:
-                            option_counts[opt] += 1
+                        opt_str = str(opt)
+                        if opt_str in option_counts:
+                            option_counts[opt_str] += 1
         except (json.JSONDecodeError, ValueError):
             pass
     
     result_options = []
     for opt in options:
-        count = option_counts[opt]
+        count = option_counts[str(opt)]
         result_options.append({
             'value': opt,
             'count': count,

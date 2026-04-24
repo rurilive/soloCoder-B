@@ -162,7 +162,8 @@ def validate_answers(questions, answers):
         
         if question.type == 'single_choice':
             options = question.get_options_list()
-            if answer not in options:
+            options_str = {str(opt) for opt in options}
+            if str(answer) not in options_str:
                 errors.append({
                     'question_id': question.id,
                     'question_text': question.text,
@@ -172,8 +173,9 @@ def validate_answers(questions, answers):
         elif question.type == 'multiple_choice':
             if isinstance(answer, list):
                 options = question.get_options_list()
+                options_str = {str(opt) for opt in options}
                 for opt in answer:
-                    if opt not in options:
+                    if str(opt) not in options_str:
                         errors.append({
                             'question_id': question.id,
                             'question_text': question.text,

@@ -2,12 +2,35 @@ from collections import Counter
 from datetime import datetime, timedelta
 import math
 import re
+import json
 
 try:
     import jieba
     JIEBA_AVAILABLE = True
 except ImportError:
     JIEBA_AVAILABLE = False
+
+
+def normalize_option_value(opt):
+    if isinstance(opt, dict):
+        if 'value' in opt:
+            return str(opt['value'])
+        elif 'label' in opt:
+            return str(opt['label'])
+    return str(opt)
+
+
+def normalize_answer_value(value):
+    if value is None:
+        return None
+    value_str = str(value).strip()
+    try:
+        parsed = json.loads(value_str)
+        if isinstance(parsed, str):
+            return parsed.strip()
+        return str(parsed)
+    except (json.JSONDecodeError, ValueError):
+        return value_str
 
 
 def calculate_percentage(count, total):
@@ -105,17 +128,31 @@ def calculate_statistics_for_single_choice(question, valid_answers):
     options = question.get_options_list()
     total_responses = len(valid_answers)
     
-    option_counts = {str(opt): 0 for opt in options}
-    original_options = {str(opt): opt for opt in options}
+    option_map = {}
+    for opt in options:
+        normalized = normalize_option_value(opt)
+        option_map[normalized] = opt
+    
+    option_counts = {normalize_option_value(opt): 0 for opt in options}
     
     for answer in valid_answers:
-        value = answer.value
-        if value in option_counts:
-            option_counts[value] += 1
+        if not answer.value:
+            continue
+        value_normalized = normalize_answer_value(answer.value)
+        if value_normalized in option_counts:
+            option_counts[value_normalized] += 1
+        else:
+            try:
+                value_int = int(float(value_normalized))
+                if str(value_int) in option_counts:
+                    option_counts[str(value_int)] += 1
+            except (ValueError, TypeError):
+                pass
     
     result_options = []
     for opt in options:
-        count = option_counts[str(opt)]
+        normalized = normalize_option_value(opt)
+        count = option_counts[normalized]
         result_options.append({
             'value': opt,
             'count': count,
@@ -129,14 +166,26 @@ def calculate_statistics_for_single_choice(question, valid_answers):
 
 
 def calculate_statistics_for_multiple_choice(question, valid_answers):
-    import json
-    
     options = question.get_options_list()
     total_responses = len(valid_answers)
     
-    option_counts = {str(opt): 0 for opt in options}
+    option_counts = {normalize_option_value(opt): 0 for opt in options}
     selection_counts = []
     total_selections = 0
+    
+    def match_and_count(opt_value):
+        opt_normalized = normalize_option_value(opt_value)
+        if opt_normalized in option_counts:
+            option_counts[opt_normalized] += 1
+            return True
+        try:
+            opt_int = int(float(opt_normalized))
+            if str(opt_int) in option_counts:
+                option_counts[str(opt_int)] += 1
+                return True
+        except (ValueError, TypeError):
+            pass
+        return False
     
     for answer in valid_answers:
         try:
@@ -147,15 +196,14 @@ def calculate_statistics_for_multiple_choice(question, valid_answers):
                     selection_counts.append(selection_count)
                     total_selections += selection_count
                     for opt in value:
-                        opt_str = str(opt)
-                        if opt_str in option_counts:
-                            option_counts[opt_str] += 1
+                        match_and_count(opt)
         except (json.JSONDecodeError, ValueError):
             pass
     
     result_options = []
     for opt in options:
-        count = option_counts[str(opt)]
+        normalized = normalize_option_value(opt)
+        count = option_counts[normalized]
         result_options.append({
             'value': opt,
             'count': count,

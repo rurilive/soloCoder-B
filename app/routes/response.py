@@ -10,6 +10,7 @@ from app.models import Survey, Question, Response, ResponseAnswer
 from app.forms.response import AccessPasswordForm, create_survey_response_form
 from app.routes.captcha import verify_captcha
 from app.utils.security import log_security_event, SecurityEvent
+from app.utils.stats import normalize_option_value
 
 response = Blueprint('response', __name__)
 
@@ -160,10 +161,24 @@ def validate_answers(questions, answers):
         if answer is None or answer == '':
             continue
         
+        def is_valid_option(opt_value, options_list):
+            opt_normalized = normalize_option_value(opt_value)
+            for valid_opt in options_list:
+                valid_normalized = normalize_option_value(valid_opt)
+                if opt_normalized == valid_normalized:
+                    return True
+                try:
+                    opt_int = int(float(opt_normalized))
+                    valid_int = int(float(valid_normalized))
+                    if opt_int == valid_int:
+                        return True
+                except (ValueError, TypeError):
+                    pass
+            return False
+        
         if question.type == 'single_choice':
             options = question.get_options_list()
-            options_str = {str(opt) for opt in options}
-            if str(answer) not in options_str:
+            if not is_valid_option(answer, options):
                 errors.append({
                     'question_id': question.id,
                     'question_text': question.text,
@@ -173,9 +188,8 @@ def validate_answers(questions, answers):
         elif question.type == 'multiple_choice':
             if isinstance(answer, list):
                 options = question.get_options_list()
-                options_str = {str(opt) for opt in options}
                 for opt in answer:
-                    if str(opt) not in options_str:
+                    if not is_valid_option(opt, options):
                         errors.append({
                             'question_id': question.id,
                             'question_text': question.text,

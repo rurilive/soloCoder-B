@@ -332,29 +332,13 @@
     </main>
     
     <script>
-        function showToast(message, type = 'success') {
-            const existingToast = document.querySelector('.toast-notification');
-            if (existingToast) {
-                existingToast.remove();
-            }
-            
-            const toast = document.createElement('div');
-            toast.className = `toast-notification ${type}`;
-            toast.textContent = message;
-            document.body.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.style.animation = 'toastOut 0.3s ease forwards';
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
-        
-        async function copyToClipboard(text, successMessage = null) {
+        async function copyToClipboard(text, showAlert = true) {
             try {
                 if (navigator.clipboard && navigator.clipboard.writeText) {
                     await navigator.clipboard.writeText(text);
-                    const msg = successMessage || `已复制: ${text}`;
-                    showToast(msg, 'success');
+                    if (showAlert) {
+                        alert(`已复制到剪切板:\n${text}`);
+                    }
                     return true;
                 } else {
                     const textArea = document.createElement('textarea');
@@ -365,19 +349,20 @@
                     textArea.select();
                     document.execCommand('copy');
                     document.body.removeChild(textArea);
-                    const msg = successMessage || `已复制: ${text}`;
-                    showToast(msg, 'success');
+                    if (showAlert) {
+                        alert(`已复制到剪切板:\n${text}`);
+                    }
                     return true;
                 }
             } catch (err) {
                 console.error('复制失败:', err);
-                showToast('复制失败，请手动复制', 'error');
+                alert('复制失败，请手动复制');
                 return false;
             }
         }
         
-        async function copyCurrentUrl(successMessage = null) {
-            return copyToClipboard(window.location.href, successMessage);
+        async function copyCurrentUrl() {
+            return copyToClipboard(window.location.href);
         }
     </script>
 </body>

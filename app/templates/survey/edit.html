@@ -234,6 +234,7 @@
         
         <div class="form-actions">
             <a href="{{ url_for('survey.list') }}" class="btn btn-secondary">取消</a>
+            <a href="{{ url_for('editor.editor_page', survey_id=survey.id) }}" class="btn" style="background: #fd7e14; color: white;">编辑问题</a>
             {{ form.submit(class='btn btn-primary') }}
         </div>
     </form>

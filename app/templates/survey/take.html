@@ -10,10 +10,7 @@
             {% if survey.description %}
             <p class="survey-description">{{ survey.description }}</p>
             {% endif %}
-            <div class="survey-share">
-                <span class="link-preview" id="currentLink">{{ url_for('response.take_survey', survey_id=survey.id, _external=True) }}</span>
-                <button type="button" class="btn-copy" onclick="copyCurrentLink('问卷链接已复制')">复制链接</button>
-            </div>
+            <button type="button" class="btn-copy" onclick="copyCurrentUrl()" style="margin-top: 15px;">复制链接</button>
         </div>
         
         <form id="surveyForm" method="POST" action="{{ url_for('response.submit_survey', survey_id=survey.id) }}">

@@ -230,6 +230,28 @@ def calculate_statistics_for_multiple_choice(question, valid_answers):
     }
 
 
+def parse_rating_value(value_str):
+    if value_str is None:
+        return None
+    value_str = str(value_str).strip()
+    if not value_str:
+        return None
+    try:
+        parsed = json.loads(value_str)
+        if isinstance(parsed, (int, float)):
+            return int(parsed) if parsed == int(parsed) else int(parsed)
+        if isinstance(parsed, str):
+            parsed = parsed.strip()
+            if parsed:
+                return int(float(parsed))
+    except (json.JSONDecodeError, ValueError, TypeError):
+        pass
+    try:
+        return int(float(value_str))
+    except (ValueError, TypeError):
+        return None
+
+
 def calculate_statistics_for_rating(question, valid_answers):
     options = question.options or {}
     min_value = options.get('min_value', 1)
@@ -239,13 +261,10 @@ def calculate_statistics_for_rating(question, valid_answers):
     value_counts = {v: 0 for v in range(min_value, max_value + 1)}
     
     for answer in valid_answers:
-        try:
-            value = int(answer.value)
-            if min_value <= value <= max_value:
-                values.append(value)
-                value_counts[value] += 1
-        except (ValueError, TypeError):
-            pass
+        value = parse_rating_value(answer.value)
+        if value is not None and min_value <= value <= max_value:
+            values.append(value)
+            value_counts[value] += 1
     
     total_responses = len(values)
     average = sum(values) / total_responses if total_responses > 0 else 0.0
@@ -271,8 +290,6 @@ def calculate_statistics_for_rating(question, valid_answers):
 
 
 def calculate_statistics_for_scale(question, valid_answers):
-    import json
-    
     options = question.options or {}
     items = options.get('items', [])
     scale_values = options.get('scale_values', [1, 2, 3, 4, 5])
@@ -291,8 +308,8 @@ def calculate_statistics_for_scale(question, valid_answers):
                 answer_dict = json.loads(answer.value) if answer.value else {}
                 value_str = answer_dict.get(item_key)
                 if value_str is not None:
-                    value = int(value_str)
-                    if value in scale_values:
+                    value = parse_rating_value(value_str)
+                    if value is not None and value in scale_values:
                         item_values.append(value)
                         value_counts[value] += 1
             except (json.JSONDecodeError, ValueError, TypeError):

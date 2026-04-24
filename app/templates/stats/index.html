@@ -379,7 +379,7 @@
                         <span class="summary-value">{{ qs.stats.overall_average }}</span>
                     </div>
                 </div>
-                {% for item in qs.stats.items %}
+                {% for item in qs.stats['items'] %}
                 <div style="margin-bottom: 15px; padding: 15px; background: white; border-radius: 6px;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
                         <strong>{{ item.text }}</strong>

@@ -92,16 +92,17 @@
                                     {% endfor %}
                                 </div>
                                 {% for item in items %}
+                                {% set item_index = loop.index0 %}
                                 <div class="likert-row">
                                     <span class="likert-item-text">{{ item.get('text', item) if item is mapping else item }}</span>
                                     {% for idx in range(scale_values|length) %}
                                     <div class="likert-option">
                                         <input type="radio" 
-                                               id="q_{{ question.id }}_{{ loop.parent.index - 1 }}_{{ loop.index }}" 
-                                               name="q_{{ question.id }}.item_{{ loop.parent.index - 1 }}" 
+                                               id="q_{{ question.id }}_{{ item_index }}_{{ loop.index0 }}" 
+                                               name="q_{{ question.id }}.item_{{ item_index }}" 
                                                value="{{ scale_values[idx] }}"
-                                               {% if current_values.get('item_' ~ (loop.parent.index - 1))|string == scale_values[idx]|string %}checked{% endif %}>
-                                        <label for="q_{{ question.id }}_{{ loop.parent.index - 1 }}_{{ loop.index }}"></label>
+                                               {% if current_values.get('item_' ~ item_index)|string == scale_values[idx]|string %}checked{% endif %}>
+                                        <label for="q_{{ question.id }}_{{ item_index }}_{{ loop.index0 }}"></label>
                                     </div>
                                     {% endfor %}
                                 </div>

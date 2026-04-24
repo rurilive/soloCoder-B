@@ -13,6 +13,7 @@
         </div>
         
         <form id="surveyForm" method="POST" action="{{ url_for('response.submit_survey', survey_id=survey.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="questions-container">
                 {% for question in questions %}
                 <div class="question-item" data-question-id="{{ question.id }}" data-question-type="{{ question.type }}">

@@ -50,7 +50,6 @@ def get_questions(survey_id):
 
 @editor.route('/api/survey/<int:survey_id>/questions', methods=['POST'])
 @login_required
-@csrf.exempt
 def add_question(survey_id):
     survey_obj = Survey.query.get_or_404(survey_id)
     
@@ -123,7 +122,6 @@ def update_question(survey_id, question_id):
 
 @editor.route('/api/survey/<int:survey_id>/questions/<int:question_id>', methods=['DELETE'])
 @login_required
-@csrf.exempt
 def delete_question(survey_id, question_id):
     survey_obj = Survey.query.get_or_404(survey_id)
     
@@ -159,7 +157,6 @@ def delete_question(survey_id, question_id):
 
 @editor.route('/api/survey/<int:survey_id>/questions/reorder', methods=['POST'])
 @login_required
-@csrf.exempt
 def reorder_questions(survey_id):
     survey_obj = Survey.query.get_or_404(survey_id)
     
@@ -198,7 +195,6 @@ def reorder_questions(survey_id):
 
 @editor.route('/api/survey/<int:survey_id>/questions/batch', methods=['POST'])
 @login_required
-@csrf.exempt
 def batch_questions(survey_id):
     survey_obj = Survey.query.get_or_404(survey_id)
     

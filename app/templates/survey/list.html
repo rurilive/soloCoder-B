@@ -203,12 +203,15 @@
                         <a href="{{ url_for('survey.edit', survey_id=item.survey.id) }}" class="action-btn btn-edit">编辑</a>
                         <a href="{{ url_for('stats.view_stats', survey_id=item.survey.id) }}" class="action-btn btn-stats">统计</a>
                         <form method="POST" action="{{ url_for('survey.copy', survey_id=item.survey.id) }}" style="display: inline;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="action-btn btn-copy" onclick="return confirm('确定要复制此问卷吗？')">复制</button>
                         </form>
                         <form method="POST" action="{{ url_for('survey.status', survey_id=item.survey.id) }}" style="display: inline;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="action-btn btn-status">切换状态</button>
                         </form>
                         <form method="POST" action="{{ url_for('survey.delete', survey_id=item.survey.id) }}" style="display: inline;" onsubmit="return confirm('确定要删除此问卷吗？此操作不可恢复。');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="action-btn btn-delete">删除</button>
                         </form>
                     </div>

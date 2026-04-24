@@ -799,6 +799,7 @@
 <script>
 const surveyId = {{ survey.id }};
 const apiBaseUrl = `/api/survey/${surveyId}`;
+const csrfToken = '{{ csrf_token() }}';
 
 let questions = [];
 let selectedQuestionId = null;
@@ -1134,7 +1135,10 @@ async function addQuestion(type) {
     try {
         const response = await fetch(`${apiBaseUrl}/questions`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
             body: JSON.stringify({
                 type: type,
                 text: defaultTexts[type],
@@ -1177,7 +1181,10 @@ async function saveCurrentQuestion() {
     try {
         const response = await fetch(`${apiBaseUrl}/questions/${selectedQuestionId}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
             body: JSON.stringify({
                 type: question.type,
                 text: text,
@@ -1283,7 +1290,8 @@ async function deleteQuestion(questionId) {
     showLoading();
     try {
         const response = await fetch(`${apiBaseUrl}/questions/${questionId}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: { 'X-CSRFToken': csrfToken }
         });
         
         const data = await response.json();
@@ -1326,7 +1334,10 @@ async function moveQuestion(questionId, direction) {
     try {
         const response = await fetch(`${apiBaseUrl}/questions/reorder`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
             body: JSON.stringify({ order: orderList })
         });
         
@@ -1357,7 +1368,10 @@ async function saveAllQuestions() {
     try {
         const response = await fetch(`${apiBaseUrl}/questions/batch`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
             body: JSON.stringify({ questions: questions })
         });
         
@@ -1658,7 +1672,10 @@ async function reorderQuestions(draggedId, targetId, insertBefore) {
     try {
         const response = await fetch(`${apiBaseUrl}/questions/reorder`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
             body: JSON.stringify({ order: orderList })
         });
         

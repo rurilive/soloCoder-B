@@ -956,6 +956,8 @@ function renderPropertiesPanel() {
         
         ${previewHtml}
     `;
+    
+    setupOptionInputListeners();
 }
 
 function renderOptionsEditor(question) {
@@ -1455,6 +1457,11 @@ function addOption() {
     `;
     editor.appendChild(newOption);
     
+    const newInput = newOption.querySelector('input[type="text"]');
+    if (newInput) {
+        newInput.addEventListener('input', handleOptionInput);
+    }
+    
     updatePreview();
 }
 
@@ -1535,6 +1542,50 @@ function updatePreview() {
     if (newPreviewSection) {
         previewSection.innerHTML = newPreviewSection.innerHTML;
     }
+}
+
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+const debouncedUpdatePreview = debounce(updatePreview, 300);
+
+function setupOptionInputListeners() {
+    const editor = document.getElementById('optionsEditor');
+    if (!editor) return;
+    
+    const optionInputs = editor.querySelectorAll('input[type="text"]');
+    optionInputs.forEach(input => {
+        input.removeEventListener('input', handleOptionInput);
+        input.addEventListener('input', handleOptionInput);
+    });
+}
+
+function handleOptionInput() {
+    const index = parseInt(this.dataset.index);
+    const value = this.value;
+    
+    const question = questions.find(q => q.id === selectedQuestionId);
+    if (!question) return;
+    
+    if (!question.options) {
+        question.options = {};
+    }
+    if (!question.options.options) {
+        question.options.options = [];
+    }
+    
+    question.options.options[index] = value;
+    
+    debouncedUpdatePreview();
 }
 
 function previewSurvey() {

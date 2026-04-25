@@ -740,15 +740,19 @@ def query_reservation():
         elif not is_valid_booking_code(booking_code):
             error = '预订凭据格式错误，应为2个大写字母加6个数字（如：AB123456）'
         else:
-            reservation = Reservation.query.filter_by(booking_code=booking_code).first()
-            
-            if not reservation:
-                error = '未找到该预订，请检查预订凭据是否正确'
-            elif customer_phone and reservation.customer_phone != customer_phone:
-                error = '联系电话与预订信息不匹配'
-            else:
-                if reservation.status == 'rejected' and reservation.recommendation_suggestions:
-                    recommendations = safe_parse_recommendations(reservation.recommendation_suggestions)
+            try:
+                reservation = Reservation.query.filter_by(booking_code=booking_code).first()
+                
+                if not reservation:
+                    error = '未找到该预订，请检查预订凭据是否正确'
+                elif customer_phone and reservation.customer_phone != customer_phone:
+                    error = '联系电话与预订信息不匹配'
+                else:
+                    if reservation.status == 'rejected' and reservation.recommendation_suggestions:
+                        recommendations = safe_parse_recommendations(reservation.recommendation_suggestions)
+            except Exception as e:
+                app.logger.error(f"查询预订时出错: {str(e)}")
+                error = '查询出错，请稍后重试或联系管理员'
     
     return render_template('query_reservation.html',
                            reservation=reservation,
@@ -823,6 +827,8 @@ def init_db():
     with app.app_context():
         db.create_all()
         
+        migrate_database()
+        
         admin = User.query.filter_by(username='admin').first()
         if not admin:
             admin = User(
@@ -862,6 +868,60 @@ def init_db():
         print('数据库初始化完成')
         print('管理员账号: admin / admin123')
 
+def migrate_database():
+    try:
+        from sqlalchemy import inspect, text
+        
+        inspector = inspect(db.engine)
+        
+        if 'reservation' in inspector.get_table_names():
+            columns = [c['name'] for c in inspector.get_columns('reservation')]
+            
+            with db.engine.connect() as conn:
+                if 'booking_code' not in columns:
+                    try:
+                        conn.execute(text('ALTER TABLE reservation ADD COLUMN booking_code VARCHAR(12)'))
+                        conn.commit()
+                        print('已添加字段: booking_code')
+                    except Exception as e:
+                        print(f'添加 booking_code 字段时出错: {e}')
+                
+                if 'reject_reason' not in columns:
+                    try:
+                        conn.execute(text('ALTER TABLE reservation ADD COLUMN reject_reason TEXT'))
+                        conn.commit()
+                        print('已添加字段: reject_reason')
+                    except Exception as e:
+                        print(f'添加 reject_reason 字段时出错: {e}')
+                
+                if 'recommendation_suggestions' not in columns:
+                    try:
+                        conn.execute(text('ALTER TABLE reservation ADD COLUMN recommendation_suggestions TEXT'))
+                        conn.commit()
+                        print('已添加字段: recommendation_suggestions')
+                    except Exception as e:
+                        print(f'添加 recommendation_suggestions 字段时出错: {e}')
+                
+                try:
+                    result = conn.execute(text('SELECT id FROM reservation WHERE booking_code IS NULL OR booking_code = ""'))
+                    rows = result.fetchall()
+                    for row in rows:
+                        booking_code = Reservation.generate_booking_code()
+                        while conn.execute(text('SELECT id FROM reservation WHERE booking_code = :code'), {'code': booking_code}).fetchone():
+                            booking_code = Reservation.generate_booking_code()
+                        conn.execute(
+                            text('UPDATE reservation SET booking_code = :code WHERE id = :id'),
+                            {'code': booking_code, 'id': row[0]}
+                        )
+                    conn.commit()
+                    if rows:
+                        print(f'已为 {len(rows)} 条旧预订记录生成预订凭据')
+                except Exception as e:
+                    print(f'更新旧预订记录时出错: {e}')
+                    
+    except Exception as e:
+        print(f'数据库迁移出错: {e}')
+
 def find_free_port():
     port = random.randint(10000, 50000)
     while True:
@@ -874,7 +934,7 @@ def find_free_port():
 
 if __name__ == '__main__':
     init_db()
-    port = 33136
+    port = find_free_port()
     print(f'服务器运行在 http://localhost:{port}')
     print(f'管理后台: http://localhost:{port}/admin')
     app.run(host='0.0.0.0', port=port, debug=True)

@@ -57,6 +57,7 @@
         <table class="table table-hover">
             <thead class="table-light">
                 <tr>
+                    <th>预订凭据</th>
                     <th>预订日期</th>
                     <th>时间</th>
                     <th>客户信息</th>
@@ -69,6 +70,12 @@
             <tbody>
                 {% for res in reservations %}
                 <tr>
+                    <td>
+                        <span class="badge bg-primary fw-bold">{{ res.booking_code }}</span>
+                        {% if res.original_booking_code %}
+                        <br><small class="text-muted">原: {{ res.original_booking_code }}</small>
+                        {% endif %}
+                    </td>
                     <td>{{ res.reservation_date }}</td>
                     <td>{{ res.start_time.strftime('%H:%M') }} - {{ res.end_time.strftime('%H:%M') }}</td>
                     <td>
@@ -167,9 +174,15 @@
                                     <div class="modal-body">
                                         <table class="table table-borderless table-sm">
                                             <tr>
-                                                <td class="text-muted">预订编号</td>
-                                                <td><strong>#{{ res.id }}</strong></td>
+                                                <td class="text-muted">预订凭据</td>
+                                                <td><span class="badge bg-primary fw-bold">{{ res.booking_code }}</span></td>
                                             </tr>
+                                            {% if res.original_booking_code %}
+                                            <tr>
+                                                <td class="text-muted">原预订凭据</td>
+                                                <td><span class="badge bg-secondary">{{ res.original_booking_code }}</span></td>
+                                            </tr>
+                                            {% endif %}
                                             <tr>
                                                 <td class="text-muted">餐厅</td>
                                                 <td>{{ res.table.restaurant.name }}</td>

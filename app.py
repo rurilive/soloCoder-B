@@ -986,7 +986,8 @@ def quick_rebook(reservation_id):
         end_time=end_time,
         notes=original_reservation.notes,
         status='pending',
-        booking_code=booking_code
+        booking_code=booking_code,
+        original_booking_code=original_reservation.booking_code
     )
     
     db.session.add(new_reservation)
@@ -1051,7 +1052,7 @@ def calendar_data():
         
         events.append({
             'id': res.id,
-            'title': f'{res.customer_name} - {res.table.table_number}号桌 ({res.guest_count}人)',
+            'title': f'[{res.booking_code}] {res.customer_name} - {res.table.table_number}号桌 ({res.guest_count}人)',
             'start': start_dt.isoformat(),
             'end': end_dt.isoformat(),
             'backgroundColor': color_map.get(res.status, '#6c757d'),
@@ -1059,6 +1060,7 @@ def calendar_data():
             'extendedProps': {
                 'status': res.status,
                 'status_display': res.status_display,
+                'booking_code': res.booking_code,
                 'table_number': res.table.table_number,
                 'guest_count': res.guest_count,
                 'phone': res.customer_phone,
@@ -1260,6 +1262,14 @@ def migrate_database():
                         print('已添加字段: booking_code')
                     except Exception as e:
                         print(f'添加 booking_code 字段时出错: {e}')
+                
+                if 'original_booking_code' not in columns:
+                    try:
+                        conn.execute(text('ALTER TABLE reservation ADD COLUMN original_booking_code VARCHAR(12)'))
+                        conn.commit()
+                        print('已添加字段: original_booking_code')
+                    except Exception as e:
+                        print(f'添加 original_booking_code 字段时出错: {e}')
                 
                 if 'reject_reason' not in columns:
                     try:

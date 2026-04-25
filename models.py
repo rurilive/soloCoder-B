@@ -73,6 +73,7 @@ class Reservation(db.Model):
     status = db.Column(db.String(20), default='pending')
     notes = db.Column(db.Text)
     booking_code = db.Column(db.String(12), unique=True, nullable=False)
+    original_booking_code = db.Column(db.String(12))
     reject_reason = db.Column(db.Text)
     recommendation_suggestions = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

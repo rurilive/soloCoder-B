@@ -22,9 +22,15 @@
                         <h3 class="mb-0 font-monospace text-primary">
                             <strong>{{ reservation.booking_code }}</strong>
                         </h3>
+                        {% if reservation.original_booking_code %}
+                        <p class="text-success small mt-2 mb-0">
+                            <i class="bi bi-check-circle"></i> 重新预订成功，原凭据: {{ reservation.original_booking_code }}
+                        </p>
+                        {% else %}
                         <p class="text-muted small mt-2 mb-0">
                             此凭据用于查询预订状态，请牢记或截图保存
                         </p>
+                        {% endif %}
                     </div>
                 </div>
                 
@@ -34,6 +40,12 @@
                         <td class="text-muted">预订凭据</td>
                         <td><strong class="font-monospace">{{ reservation.booking_code }}</strong></td>
                     </tr>
+                    {% if reservation.original_booking_code %}
+                    <tr>
+                        <td class="text-muted">原预订凭据</td>
+                        <td><span class="text-muted font-monospace">{{ reservation.original_booking_code }}</span></td>
+                    </tr>
+                    {% endif %}
                     <tr>
                         <td class="text-muted">餐厅</td>
                         <td><strong>{{ restaurant.name }}</strong></td>

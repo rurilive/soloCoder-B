@@ -1,0 +1,82 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{% if store_manager %}编辑店长{% else %}添加店长{% endif %} - 管理后台{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        {% if store_manager %}
+        编辑店长
+        {% else %}
+        添加店长
+        {% endif %}
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('admin_store_managers') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> 返回列表
+        </a>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card shadow">
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">用户名 *</label>
+                        <input type="text" class="form-control" id="username" name="username" required
+                               value="{{ store_manager.username if store_manager else '' }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="password" class="form-label">
+                            密码 {% if not store_manager %}*{% else %}(留空则不修改){% endif %}
+                        </label>
+                        <input type="password" class="form-control" id="password" name="password"
+                               {% if not store_manager %}required{% endif %}>
+                        {% if store_manager %}
+                        <div class="form-text">如需修改密码，请输入新密码，否则留空</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('admin_store_managers') }}" class="btn btn-secondary">
+                            取消
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            {% if store_manager %}保存修改{% else %}添加店长{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        {% if store_manager and managed_restaurants %}
+        <div class="card shadow mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">管理的餐厅</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    {% for restaurant in managed_restaurants %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ restaurant.name }}</strong>
+                            {% if restaurant.address %}
+                            <br><small class="text-muted">{{ restaurant.address }}</small>
+                            {% endif %}
+                        </div>
+                        <a href="{{ url_for('edit_restaurant', restaurant_id=restaurant.id) }}" 
+                           class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-pencil"></i> 编辑
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -12,6 +12,7 @@ class User(db.Model, UserMixin):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
+    is_store_manager = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def set_password(self, password):
@@ -19,6 +20,12 @@ class User(db.Model, UserMixin):
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+    def get_managed_restaurants(self):
+        return Restaurant.query.filter_by(store_manager_id=self.id).all()
+
+    def manages_restaurant(self, restaurant_id):
+        return Restaurant.query.filter_by(id=restaurant_id, store_manager_id=self.id).first() is not None
 
 class Restaurant(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -28,10 +35,12 @@ class Restaurant(db.Model):
     description = db.Column(db.Text)
     open_time = db.Column(db.Time, nullable=False)
     close_time = db.Column(db.Time, nullable=False)
+    store_manager_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     tables = db.relationship('Table', backref='restaurant', lazy=True, cascade='all, delete-orphan')
+    store_manager = db.relationship('User', backref='managed_restaurants', lazy=True)
 
 class Table(db.Model):
     id = db.Column(db.Integer, primary_key=True)

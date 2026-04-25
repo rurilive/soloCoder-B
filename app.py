@@ -3,6 +3,7 @@ import random
 import socket
 import re
 import json
+from functools import wraps
 from datetime import datetime, date, time, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
@@ -73,6 +74,33 @@ def safe_parse_recommendations(data_str):
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(safe_parse_int(user_id, default=0))
+
+def admin_required(f):
+    @wraps(f)
+    @login_required
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_admin:
+            flash('您没有权限执行此操作', 'danger')
+            return redirect(url_for('admin_dashboard'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def store_manager_required(f):
+    @wraps(f)
+    @login_required
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_admin and not current_user.is_store_manager:
+            flash('您没有权限执行此操作', 'danger')
+            return redirect(url_for('admin_dashboard'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def can_manage_restaurant(restaurant_id):
+    if current_user.is_admin:
+        return True
+    if current_user.is_store_manager:
+        return current_user.manages_restaurant(restaurant_id)
+    return False
 
 def get_available_tables(restaurant_id, reservation_date, start_time, end_time, guest_count=None):
     restaurant = Restaurant.query.get(restaurant_id)
@@ -316,16 +344,37 @@ def admin_logout():
 @login_required
 def admin_dashboard():
     today = date.today()
-    today_reservations = Reservation.query.filter(
-        Reservation.reservation_date == today
-    ).order_by(Reservation.start_time).all()
     
-    pending_reservations = Reservation.query.filter_by(
-        status='pending'
-    ).order_by(Reservation.created_at).all()
-    
-    total_tables = Table.query.filter_by(is_active=True).count()
-    total_restaurants = Restaurant.query.count()
+    if current_user.is_admin:
+        today_reservations = Reservation.query.filter(
+            Reservation.reservation_date == today
+        ).order_by(Reservation.start_time).all()
+        
+        pending_reservations = Reservation.query.filter_by(
+            status='pending'
+        ).order_by(Reservation.created_at).all()
+        
+        total_tables = Table.query.filter_by(is_active=True).count()
+        total_restaurants = Restaurant.query.count()
+    else:
+        managed_restaurants = current_user.get_managed_restaurants()
+        managed_restaurant_ids = [r.id for r in managed_restaurants]
+        
+        today_reservations = Reservation.query.join(Table).filter(
+            Reservation.reservation_date == today,
+            Table.restaurant_id.in_(managed_restaurant_ids)
+        ).order_by(Reservation.start_time).all()
+        
+        pending_reservations = Reservation.query.join(Table).filter(
+            Reservation.status == 'pending',
+            Table.restaurant_id.in_(managed_restaurant_ids)
+        ).order_by(Reservation.created_at).all()
+        
+        total_tables = Table.query.filter(
+            Table.is_active == True,
+            Table.restaurant_id.in_(managed_restaurant_ids)
+        ).count()
+        total_restaurants = len(managed_restaurants)
     
     return render_template('admin/dashboard.html',
                            today_reservations=today_reservations,
@@ -337,12 +386,17 @@ def admin_dashboard():
 @app.route('/admin/restaurants')
 @login_required
 def admin_restaurants():
-    restaurants = Restaurant.query.all()
+    if current_user.is_admin:
+        restaurants = Restaurant.query.all()
+    else:
+        restaurants = current_user.get_managed_restaurants()
     return render_template('admin/restaurants.html', restaurants=restaurants)
 
 @app.route('/admin/restaurant/add', methods=['GET', 'POST'])
-@login_required
+@admin_required
 def add_restaurant():
+    store_managers = User.query.filter_by(is_store_manager=True).all()
+    
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
         address = request.form.get('address', '').strip()
@@ -350,6 +404,7 @@ def add_restaurant():
         description = request.form.get('description', '').strip()
         open_time_str = request.form.get('open_time')
         close_time_str = request.form.get('close_time')
+        store_manager_id_raw = request.form.get('store_manager_id')
         
         errors = []
         
@@ -370,6 +425,12 @@ def add_restaurant():
         
         if description and len(description) > 1000:
             errors.append('描述不能超过1000字符')
+        
+        store_manager_id = safe_parse_int(store_manager_id_raw, default=None)
+        if store_manager_id is not None:
+            store_manager = User.query.get(store_manager_id)
+            if not store_manager or not store_manager.is_store_manager:
+                errors.append('请选择有效的店长')
         
         if errors:
             for error in errors:
@@ -389,7 +450,8 @@ def add_restaurant():
             phone=phone,
             description=description,
             open_time=open_time,
-            close_time=close_time
+            close_time=close_time,
+            store_manager_id=store_manager_id
         )
         
         db.session.add(restaurant)
@@ -398,12 +460,18 @@ def add_restaurant():
         flash('餐厅添加成功', 'success')
         return redirect(url_for('admin_restaurants'))
     
-    return render_template('admin/restaurant_form.html', restaurant=None)
+    return render_template('admin/restaurant_form.html', restaurant=None, store_managers=store_managers)
 
 @app.route('/admin/restaurant/<int:restaurant_id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_restaurant(restaurant_id):
     restaurant = Restaurant.query.get_or_404(restaurant_id)
+    
+    if not can_manage_restaurant(restaurant_id):
+        flash('您没有权限管理此餐厅', 'danger')
+        return redirect(url_for('admin_dashboard'))
+    
+    store_managers = User.query.filter_by(is_store_manager=True).all() if current_user.is_admin else []
     
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
@@ -432,6 +500,16 @@ def edit_restaurant(restaurant_id):
         
         if description and len(description) > 1000:
             errors.append('描述不能超过1000字符')
+        
+        if current_user.is_admin:
+            store_manager_id_raw = request.form.get('store_manager_id')
+            store_manager_id = safe_parse_int(store_manager_id_raw, default=None)
+            if store_manager_id is not None:
+                store_manager = User.query.get(store_manager_id)
+                if not store_manager or not store_manager.is_store_manager:
+                    errors.append('请选择有效的店长')
+        else:
+            store_manager_id = restaurant.store_manager_id
         
         if errors:
             for error in errors:
@@ -452,14 +530,17 @@ def edit_restaurant(restaurant_id):
         restaurant.open_time = open_time
         restaurant.close_time = close_time
         
+        if current_user.is_admin:
+            restaurant.store_manager_id = store_manager_id
+        
         db.session.commit()
         flash('餐厅信息已更新', 'success')
         return redirect(url_for('admin_restaurants'))
     
-    return render_template('admin/restaurant_form.html', restaurant=restaurant)
+    return render_template('admin/restaurant_form.html', restaurant=restaurant, store_managers=store_managers)
 
 @app.route('/admin/restaurant/<int:restaurant_id>/delete', methods=['POST'])
-@login_required
+@admin_required
 def delete_restaurant(restaurant_id):
     restaurant = Restaurant.query.get_or_404(restaurant_id)
     
@@ -474,14 +555,27 @@ def delete_restaurant(restaurant_id):
 def admin_tables():
     restaurant_id = request.args.get('restaurant_id', type=int)
     
+    if current_user.is_admin:
+        restaurants = Restaurant.query.all()
+    else:
+        restaurants = current_user.get_managed_restaurants()
+    
+    managed_restaurant_ids = [r.id for r in restaurants]
+    
     if restaurant_id:
+        if not current_user.is_admin and restaurant_id not in managed_restaurant_ids:
+            flash('您没有权限查看此餐厅的餐桌', 'danger')
+            return redirect(url_for('admin_tables'))
+        
         tables = Table.query.filter_by(restaurant_id=restaurant_id).all()
         restaurant = Restaurant.query.get(restaurant_id)
     else:
-        tables = Table.query.all()
+        if current_user.is_admin:
+            tables = Table.query.all()
+        else:
+            tables = Table.query.filter(Table.restaurant_id.in_(managed_restaurant_ids)).all()
         restaurant = None
     
-    restaurants = Restaurant.query.all()
     return render_template('admin/tables.html', 
                            tables=tables, 
                            restaurants=restaurants, 
@@ -490,6 +584,15 @@ def admin_tables():
 @app.route('/admin/table/add', methods=['GET', 'POST'])
 @login_required
 def add_table():
+    if current_user.is_admin:
+        restaurants = Restaurant.query.all()
+    else:
+        restaurants = current_user.get_managed_restaurants()
+    
+    if not restaurants:
+        flash('没有可管理的餐厅', 'danger')
+        return redirect(url_for('admin_tables'))
+    
     if request.method == 'POST':
         restaurant_id_raw = request.form.get('restaurant_id')
         table_number_raw = request.form.get('table_number')
@@ -500,6 +603,11 @@ def add_table():
         restaurant_id = safe_parse_int(restaurant_id_raw, default=0, min_val=1)
         if restaurant_id < 1:
             errors.append('请选择有效的餐厅')
+        
+        if not current_user.is_admin:
+            managed_ids = [r.id for r in restaurants]
+            if restaurant_id not in managed_ids:
+                errors.append('您没有权限管理此餐厅')
         
         table_number = safe_parse_int(table_number_raw, default=0, min_val=1)
         if table_number < 1:
@@ -540,13 +648,21 @@ def add_table():
         flash('餐桌添加成功', 'success')
         return redirect(url_for('admin_tables', restaurant_id=restaurant_id))
     
-    restaurants = Restaurant.query.all()
     return render_template('admin/table_form.html', table=None, restaurants=restaurants)
 
 @app.route('/admin/table/<int:table_id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_table(table_id):
     table = Table.query.get_or_404(table_id)
+    
+    if not can_manage_restaurant(table.restaurant_id):
+        flash('您没有权限管理此餐桌', 'danger')
+        return redirect(url_for('admin_tables'))
+    
+    if current_user.is_admin:
+        restaurants = Restaurant.query.all()
+    else:
+        restaurants = current_user.get_managed_restaurants()
     
     if request.method == 'POST':
         table_number_raw = request.form.get('table_number')
@@ -585,13 +701,17 @@ def edit_table(table_id):
         flash('餐桌信息已更新', 'success')
         return redirect(url_for('admin_tables', restaurant_id=table.restaurant_id))
     
-    restaurants = Restaurant.query.all()
     return render_template('admin/table_form.html', table=table, restaurants=restaurants)
 
 @app.route('/admin/table/<int:table_id>/delete', methods=['POST'])
 @login_required
 def delete_table(table_id):
     table = Table.query.get_or_404(table_id)
+    
+    if not can_manage_restaurant(table.restaurant_id):
+        flash('您没有权限管理此餐桌', 'danger')
+        return redirect(url_for('admin_tables'))
+    
     restaurant_id = table.restaurant_id
     
     db.session.delete(table)
@@ -607,11 +727,24 @@ def admin_reservations():
     restaurant_id = request.args.get('restaurant_id', type=int)
     date_str = request.args.get('date')
     
+    if current_user.is_admin:
+        restaurants = Restaurant.query.all()
+    else:
+        restaurants = current_user.get_managed_restaurants()
+    
+    managed_restaurant_ids = [r.id for r in restaurants]
+    
     query = Reservation.query.join(Table)
+    
+    if not current_user.is_admin:
+        query = query.filter(Table.restaurant_id.in_(managed_restaurant_ids))
     
     if status:
         query = query.filter(Reservation.status == status)
     if restaurant_id:
+        if not current_user.is_admin and restaurant_id not in managed_restaurant_ids:
+            flash('您没有权限查看此餐厅的预订', 'danger')
+            return redirect(url_for('admin_reservations'))
         query = query.filter(Table.restaurant_id == restaurant_id)
     if date_str:
         try:
@@ -625,7 +758,6 @@ def admin_reservations():
         Reservation.start_time.desc()
     ).all()
     
-    restaurants = Restaurant.query.all()
     return render_template('admin/reservations.html',
                            reservations=reservations,
                            restaurants=restaurants,
@@ -635,6 +767,11 @@ def admin_reservations():
 @login_required
 def update_reservation_status(reservation_id):
     reservation = Reservation.query.get_or_404(reservation_id)
+    
+    if not can_manage_restaurant(reservation.table.restaurant_id):
+        flash('您没有权限管理此预订', 'danger')
+        return redirect(url_for('admin_reservations'))
+    
     new_status = request.form.get('status')
     reject_reason = request.form.get('reject_reason', '')
     
@@ -786,10 +923,17 @@ def calendar_data():
     if start_date > end_date:
         start_date, end_date = end_date, start_date
     
-    reservations = Reservation.query.filter(
+    query = Reservation.query.filter(
         Reservation.reservation_date >= start_date,
         Reservation.reservation_date <= end_date
-    ).all()
+    )
+    
+    if not current_user.is_admin:
+        managed_restaurants = current_user.get_managed_restaurants()
+        managed_restaurant_ids = [r.id for r in managed_restaurants]
+        query = query.join(Table).filter(Table.restaurant_id.in_(managed_restaurant_ids))
+    
+    reservations = query.all()
     
     events = []
     for res in reservations:
@@ -822,6 +966,111 @@ def calendar_data():
         })
     
     return jsonify(events)
+
+@app.route('/admin/store_managers')
+@admin_required
+def admin_store_managers():
+    store_managers = User.query.filter_by(is_store_manager=True).order_by(User.created_at.desc()).all()
+    return render_template('admin/store_managers.html', store_managers=store_managers)
+
+@app.route('/admin/store_manager/add', methods=['GET', 'POST'])
+@admin_required
+def add_store_manager():
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        
+        errors = []
+        
+        if not username or len(username) < 1 or len(username) > 80:
+            errors.append('用户名必须在1-80字符之间')
+        
+        if not password or len(password) < 6:
+            errors.append('密码至少6个字符')
+        
+        existing = User.query.filter_by(username=username).first()
+        if existing:
+            errors.append('用户名已存在')
+        
+        if errors:
+            for error in errors:
+                flash(error, 'danger')
+            return redirect(url_for('add_store_manager'))
+        
+        store_manager = User(
+            username=username,
+            is_store_manager=True
+        )
+        store_manager.set_password(password)
+        
+        db.session.add(store_manager)
+        db.session.commit()
+        
+        flash('店长添加成功', 'success')
+        return redirect(url_for('admin_store_managers'))
+    
+    return render_template('admin/store_manager_form.html', store_manager=None)
+
+@app.route('/admin/store_manager/<int:user_id>/edit', methods=['GET', 'POST'])
+@admin_required
+def edit_store_manager(user_id):
+    store_manager = User.query.get_or_404(user_id)
+    
+    if not store_manager.is_store_manager:
+        flash('该用户不是店长', 'danger')
+        return redirect(url_for('admin_store_managers'))
+    
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        
+        errors = []
+        
+        if not username or len(username) < 1 or len(username) > 80:
+            errors.append('用户名必须在1-80字符之间')
+        
+        if password and len(password) < 6:
+            errors.append('密码至少6个字符')
+        
+        existing = User.query.filter_by(username=username).first()
+        if existing and existing.id != store_manager.id:
+            errors.append('用户名已存在')
+        
+        if errors:
+            for error in errors:
+                flash(error, 'danger')
+            return redirect(url_for('edit_store_manager', user_id=user_id))
+        
+        store_manager.username = username
+        if password:
+            store_manager.set_password(password)
+        
+        db.session.commit()
+        flash('店长信息已更新', 'success')
+        return redirect(url_for('admin_store_managers'))
+    
+    managed_restaurants = store_manager.get_managed_restaurants()
+    return render_template('admin/store_manager_form.html', store_manager=store_manager, managed_restaurants=managed_restaurants)
+
+@app.route('/admin/store_manager/<int:user_id>/delete', methods=['POST'])
+@admin_required
+def delete_store_manager(user_id):
+    store_manager = User.query.get_or_404(user_id)
+    
+    if not store_manager.is_store_manager:
+        flash('该用户不是店长', 'danger')
+        return redirect(url_for('admin_store_managers'))
+    
+    managed_restaurants = store_manager.get_managed_restaurants()
+    if managed_restaurants:
+        flash('该店长还有管理的餐厅，请先解除餐厅管理关系', 'danger')
+        return redirect(url_for('edit_store_manager', user_id=user_id))
+    
+    db.session.delete(store_manager)
+    db.session.commit()
+    
+    flash('店长已删除', 'success')
+    return redirect(url_for('admin_store_managers'))
 
 def init_db():
     with app.app_context():
@@ -873,6 +1122,31 @@ def migrate_database():
         from sqlalchemy import inspect, text
         
         inspector = inspect(db.engine)
+        
+        if 'user' in inspector.get_table_names():
+            columns = [c['name'] for c in inspector.get_columns('user')]
+            
+            with db.engine.connect() as conn:
+                if 'is_store_manager' not in columns:
+                    try:
+                        conn.execute(text('ALTER TABLE user ADD COLUMN is_store_manager BOOLEAN DEFAULT 0'))
+                        conn.commit()
+                        print('已添加字段: user.is_store_manager')
+                    except Exception as e:
+                        print(f'添加 is_store_manager 字段时出错: {e}')
+        
+        if 'restaurant' in inspector.get_table_names():
+            columns = [c['name'] for c in inspector.get_columns('restaurant')]
+            
+            with db.engine.connect() as conn:
+                if 'store_manager_id' not in columns:
+                    try:
+                        conn.execute(text('ALTER TABLE restaurant ADD COLUMN store_manager_id INTEGER'))
+                        conn.execute(text('CREATE INDEX IF NOT EXISTS idx_restaurant_store_manager ON restaurant(store_manager_id)'))
+                        conn.commit()
+                        print('已添加字段: restaurant.store_manager_id')
+                    except Exception as e:
+                        print(f'添加 store_manager_id 字段时出错: {e}')
         
         if 'reservation' in inspector.get_table_names():
             columns = [c['name'] for c in inspector.get_columns('reservation')]

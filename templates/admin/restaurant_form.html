@@ -59,6 +59,22 @@
                         <textarea class="form-control" id="description" name="description" rows="3">{{ restaurant.description if restaurant else '' }}</textarea>
                     </div>
                     
+                    {% if store_managers %}
+                    <div class="mb-4">
+                        <label for="store_manager_id" class="form-label">分配店长</label>
+                        <select class="form-select" id="store_manager_id" name="store_manager_id">
+                            <option value="">-- 不分配店长 --</option>
+                            {% for manager in store_managers %}
+                            <option value="{{ manager.id }}" 
+                                    {% if restaurant and restaurant.store_manager_id == manager.id %}selected{% endif %}>
+                                {{ manager.username }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">选择一位店长来管理此餐厅</div>
+                    </div>
+                    {% endif %}
+                    
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                         <a href="{{ url_for('admin_restaurants') }}" class="btn btn-secondary">
                             取消

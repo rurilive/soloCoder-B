@@ -1,0 +1,90 @@
+{% extends "admin/base.html" %}
+
+{% block title %}店长管理 - 管理后台{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">店长管理</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('add_store_manager') }}" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-lg"></i> 添加店长
+        </a>
+    </div>
+</div>
+
+{% if store_managers %}
+<div class="card shadow">
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead class="table-light">
+                <tr>
+                    <th>用户名</th>
+                    <th>管理餐厅数</th>
+                    <th>创建时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for manager in store_managers %}
+                <tr>
+                    <td>{{ manager.username }}</td>
+                    <td>{{ manager.managed_restaurants|length }} 家</td>
+                    <td>{{ manager.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td>
+                        <a href="{{ url_for('edit_store_manager', user_id=manager.id) }}" 
+                           class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-pencil"></i> 编辑
+                        </a>
+                        <button type="button" class="btn btn-sm btn-outline-danger" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#deleteModal{{ manager.id }}">
+                            <i class="bi bi-trash"></i> 删除
+                        </button>
+                    </td>
+                </tr>
+                
+                <div class="modal fade" id="deleteModal{{ manager.id }}" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">确认删除</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>确定要删除店长 <strong>{{ manager.username }}</strong> 吗？</p>
+                                {% if manager.managed_restaurants %}
+                                <p class="text-warning">
+                                    <i class="bi bi-exclamation-triangle"></i> 
+                                    该店长当前管理 {{ manager.managed_restaurants|length }} 家餐厅，
+                                    请先解除管理关系后再删除。
+                                </p>
+                                {% endif %}
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                                {% if not manager.managed_restaurants %}
+                                <form method="POST" action="{{ url_for('delete_store_manager', user_id=manager.id) }}">
+                                    <button type="submit" class="btn btn-danger">确认删除</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="card shadow">
+    <div class="card-body text-center py-5">
+        <i class="bi bi-person-badge fs-1 text-muted"></i>
+        <p class="mt-3 text-muted">暂无店长数据</p>
+        <a href="{{ url_for('add_store_manager') }}" class="btn btn-primary">
+            添加第一个店长
+        </a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

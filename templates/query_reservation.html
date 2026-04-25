@@ -2,6 +2,25 @@
 
 {% block title %}查询预订{% endblock %}
 
+{% block extra_css %}
+<style>
+    .hover-shadow {
+        transition: all 0.3s ease;
+    }
+    .hover-shadow:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+        border-color: #007bff !important;
+    }
+    .hover-shadow:active {
+        transform: translateY(0);
+    }
+    .cursor-pointer {
+        cursor: pointer;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row justify-content-center mt-5">
     <div class="col-lg-6">
@@ -136,21 +155,28 @@
                 {% if recommendations %}
                 <div class="card border-info">
                     <div class="card-header bg-info text-white">
-                        <h6 class="mb-0"><i class="bi bi-lightbulb"></i> 推荐方案</h6>
+                        <h6 class="mb-0"><i class="bi bi-lightbulb"></i> 推荐方案 - 点击即可快速重新预订</h6>
                     </div>
                     <div class="card-body">
                         {% if recommendations.alternative_times %}
                         <div class="mb-4">
-                            <h6 class="text-primary"><i class="bi bi-clock"></i> 其他可用时段</h6>
+                            <h6 class="text-primary"><i class="bi bi-clock"></i> 其他可用时段（同一天）</h6>
                             <div class="row">
                                 {% for time in recommendations.alternative_times %}
                                 <div class="col-md-4 mb-2">
-                                    <div class="card border-primary">
-                                        <div class="card-body py-2 px-3">
-                                            <strong>{{ time.time }} - {{ time.end_time }}</strong>
-                                            <small class="text-muted d-block">{{ time.tables_available }} 桌可用</small>
-                                        </div>
-                                    </div>
+                                    <form method="POST" action="{{ url_for('quick_rebook', reservation_id=reservation.id) }}">
+                                        <input type="hidden" name="table_id" value="{{ time.table_id }}">
+                                        <input type="hidden" name="reservation_date" value="{{ time.date }}">
+                                        <input type="hidden" name="start_time" value="{{ time.time }}">
+                                        <input type="hidden" name="end_time" value="{{ time.end_time }}">
+                                        <button type="submit" class="card border-primary text-decoration-none w-100 text-start p-2 cursor-pointer hover-shadow">
+                                            <div class="card-body py-2 px-3">
+                                                <strong>{{ time.time }} - {{ time.end_time }}</strong>
+                                                <small class="text-muted d-block">{{ time.tables_available }} 桌可用 · {{ time.table_number }}号桌</small>
+                                                <small class="text-success"><i class="bi bi-check-circle"></i> 点击预订</small>
+                                            </div>
+                                        </button>
+                                    </form>
                                 </div>
                                 {% endfor %}
                             </div>
@@ -163,12 +189,20 @@
                             <div class="row">
                                 {% for dt in recommendations.alternative_dates %}
                                 <div class="col-md-4 mb-2">
-                                    <div class="card border-primary">
-                                        <div class="card-body py-2 px-3">
-                                            <strong>{{ dt.date }}</strong>
-                                            <small class="text-muted d-block">{{ dt.weekday }} · {{ dt.tables_available }} 桌可用</small>
-                                        </div>
-                                    </div>
+                                    <form method="POST" action="{{ url_for('quick_rebook', reservation_id=reservation.id) }}">
+                                        <input type="hidden" name="table_id" value="{{ dt.table_id }}">
+                                        <input type="hidden" name="reservation_date" value="{{ dt.date }}">
+                                        <input type="hidden" name="start_time" value="{{ dt.start_time }}">
+                                        <input type="hidden" name="end_time" value="{{ dt.end_time }}">
+                                        <button type="submit" class="card border-primary text-decoration-none w-100 text-start p-2 cursor-pointer hover-shadow">
+                                            <div class="card-body py-2 px-3">
+                                                <strong>{{ dt.date }}</strong>
+                                                <small class="text-muted d-block">{{ dt.weekday }} · {{ dt.start_time }}-{{ dt.end_time }}</small>
+                                                <small class="text-muted d-block">{{ dt.tables_available }} 桌可用 · {{ dt.table_number }}号桌</small>
+                                                <small class="text-success"><i class="bi bi-check-circle"></i> 点击预订</small>
+                                            </div>
+                                        </button>
+                                    </form>
                                 </div>
                                 {% endfor %}
                             </div>
@@ -176,17 +210,25 @@
                         {% endif %}
                         
                         {% if recommendations.alternative_tables %}
-                        <div>
-                            <h6 class="text-primary"><i class="bi bi-table"></i> 其他可用餐桌</h6>
+                        <div class="mb-4">
+                            <h6 class="text-primary"><i class="bi bi-table"></i> 其他可用餐桌（同一时段）</h6>
                             <div class="row">
                                 {% for table in recommendations.alternative_tables %}
                                 <div class="col-md-4 mb-2">
-                                    <div class="card border-primary">
-                                        <div class="card-body py-2 px-3">
-                                            <strong>{{ table.table_number }} 号桌</strong>
-                                            <small class="text-muted d-block">可容纳 {{ table.capacity }} 人</small>
-                                        </div>
-                                    </div>
+                                    <form method="POST" action="{{ url_for('quick_rebook', reservation_id=reservation.id) }}">
+                                        <input type="hidden" name="table_id" value="{{ table.table_id }}">
+                                        <input type="hidden" name="reservation_date" value="{{ table.date }}">
+                                        <input type="hidden" name="start_time" value="{{ table.start_time }}">
+                                        <input type="hidden" name="end_time" value="{{ table.end_time }}">
+                                        <button type="submit" class="card border-primary text-decoration-none w-100 text-start p-2 cursor-pointer hover-shadow">
+                                            <div class="card-body py-2 px-3">
+                                                <strong>{{ table.table_number }} 号桌</strong>
+                                                <small class="text-muted d-block">可容纳 {{ table.capacity }} 人</small>
+                                                <small class="text-muted d-block">{{ table.date }} {{ table.start_time }}-{{ table.end_time }}</small>
+                                                <small class="text-success"><i class="bi bi-check-circle"></i> 点击预订</small>
+                                            </div>
+                                        </button>
+                                    </form>
                                 </div>
                                 {% endfor %}
                             </div>
@@ -194,8 +236,11 @@
                         {% endif %}
                         
                         <div class="mt-4 text-center">
-                            <a href="{{ url_for('index') }}" class="btn btn-primary">
-                                <i class="bi bi-calendar-plus"></i> 重新预订
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i> 点击上方任意推荐方案即可使用您的原有信息快速重新预订，无需重新填写表单。
+                            </div>
+                            <a href="{{ url_for('index') }}" class="btn btn-outline-primary">
+                                <i class="bi bi-calendar-plus"></i> 或手动重新预订
                             </a>
                         </div>
                     </div>

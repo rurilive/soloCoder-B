@@ -796,7 +796,10 @@ def generate_recommendations(reservation):
     recommendations = {
         'alternative_times': [],
         'alternative_tables': [],
-        'alternative_dates': []
+        'alternative_dates': [],
+        'reservation_id': reservation.id,
+        'restaurant_id': reservation.table.restaurant_id,
+        'guest_count': reservation.guest_count
     }
     
     restaurant = reservation.table.restaurant
@@ -821,10 +824,14 @@ def generate_recommendations(reservation):
         )
         
         if available_tables:
+            first_table = available_tables[0]
             recommendations['alternative_times'].append({
                 'time': slot.strftime('%H:%M'),
                 'end_time': end_time.strftime('%H:%M'),
-                'tables_available': len(available_tables)
+                'tables_available': len(available_tables),
+                'table_id': first_table.id,
+                'table_number': first_table.table_number,
+                'date': original_date.isoformat()
             })
     
     for days_offset in range(1, 8):
@@ -840,10 +847,15 @@ def generate_recommendations(reservation):
         )
         
         if available_tables:
+            first_table = available_tables[0]
             recommendations['alternative_dates'].append({
                 'date': alt_date.isoformat(),
                 'weekday': ['周一', '周二', '周三', '周四', '周五', '周六', '周日'][alt_date.weekday()],
-                'tables_available': len(available_tables)
+                'tables_available': len(available_tables),
+                'table_id': first_table.id,
+                'table_number': first_table.table_number,
+                'start_time': original_start.strftime('%H:%M'),
+                'end_time': alt_end.strftime('%H:%M')
             })
     
     all_tables = Table.query.filter_by(
@@ -856,8 +868,12 @@ def generate_recommendations(reservation):
             continue
         if table.is_available(original_date, original_start, original_end):
             recommendations['alternative_tables'].append({
+                'table_id': table.id,
                 'table_number': table.table_number,
-                'capacity': table.capacity
+                'capacity': table.capacity,
+                'date': original_date.isoformat(),
+                'start_time': original_start.strftime('%H:%M'),
+                'end_time': original_end.strftime('%H:%M')
             })
     
     return recommendations
@@ -895,6 +911,91 @@ def query_reservation():
                            reservation=reservation,
                            error=error,
                            recommendations=recommendations)
+
+@app.route('/reservation/<int:reservation_id>/quick_rebook', methods=['POST'])
+def quick_rebook(reservation_id):
+    original_reservation = Reservation.query.get_or_404(reservation_id)
+    
+    if original_reservation.status != 'rejected':
+        flash('只有被拒绝的预订才能快速重新预订', 'danger')
+        return redirect(url_for('query_reservation'))
+    
+    table_id = safe_parse_int(request.form.get('table_id'), default=0, min_val=1)
+    reservation_date_str = request.form.get('reservation_date')
+    start_time_str = request.form.get('start_time')
+    end_time_str = request.form.get('end_time')
+    
+    errors = []
+    
+    if table_id < 1:
+        errors.append('请选择有效的餐桌')
+    
+    if not reservation_date_str or not is_valid_date(reservation_date_str):
+        errors.append('请选择有效的日期')
+    
+    if not start_time_str or not is_valid_time(start_time_str):
+        errors.append('请选择有效的开始时间')
+    
+    if not end_time_str or not is_valid_time(end_time_str):
+        errors.append('请选择有效的结束时间')
+    
+    if errors:
+        for error in errors:
+            flash(error, 'danger')
+        return redirect(url_for('query_reservation'))
+    
+    try:
+        reservation_date = datetime.strptime(reservation_date_str, '%Y-%m-%d').date()
+        start_time = datetime.strptime(start_time_str, '%H:%M').time()
+        end_time = datetime.strptime(end_time_str, '%H:%M').time()
+    except ValueError:
+        flash('日期或时间格式错误', 'danger')
+        return redirect(url_for('query_reservation'))
+    
+    table = Table.query.get(table_id)
+    restaurant = Restaurant.query.get(original_reservation.table.restaurant_id)
+    
+    if not table or table.restaurant_id != restaurant.id:
+        flash('餐桌不存在', 'danger')
+        return redirect(url_for('query_reservation'))
+    
+    if not table.is_active:
+        flash('该餐桌已停用', 'danger')
+        return redirect(url_for('query_reservation'))
+    
+    if original_reservation.guest_count > table.capacity:
+        flash('用餐人数超过餐桌容量', 'danger')
+        return redirect(url_for('query_reservation'))
+    
+    if not table.is_available(reservation_date, start_time, end_time):
+        flash('该时间段已被预订，请选择其他时间', 'danger')
+        return redirect(url_for('query_reservation'))
+    
+    booking_code = Reservation.generate_booking_code()
+    while Reservation.query.filter_by(booking_code=booking_code).first():
+        booking_code = Reservation.generate_booking_code()
+    
+    new_reservation = Reservation(
+        table_id=table_id,
+        customer_name=original_reservation.customer_name,
+        customer_phone=original_reservation.customer_phone,
+        customer_email=original_reservation.customer_email,
+        guest_count=original_reservation.guest_count,
+        reservation_date=reservation_date,
+        start_time=start_time,
+        end_time=end_time,
+        notes=original_reservation.notes,
+        status='pending',
+        booking_code=booking_code
+    )
+    
+    db.session.add(new_reservation)
+    db.session.commit()
+    
+    flash('重新预订成功！我们将尽快与您确认。', 'success')
+    return render_template('reservation_success.html', 
+                           reservation=new_reservation, 
+                           restaurant=restaurant)
 
 @app.route('/admin/calendar')
 @login_required
@@ -1208,7 +1309,7 @@ def find_free_port():
 
 if __name__ == '__main__':
     init_db()
-    port = find_free_port()
+    port = 2222
     print(f'服务器运行在 http://localhost:{port}')
     print(f'管理后台: http://localhost:{port}/admin')
     app.run(host='0.0.0.0', port=port, debug=True)

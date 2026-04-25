@@ -10,6 +10,27 @@
     </div>
 </div>
 
+<div class="row justify-content-center mb-5">
+    <div class="col-lg-6">
+        <div class="card border-info shadow">
+            <div class="card-body">
+                <form action="{{ url_for('query_reservation') }}" method="POST" class="row g-3 align-items-end">
+                    <div class="col-md-8">
+                        <label class="form-label"><i class="bi bi-search"></i> 查询预订状态</label>
+                        <input type="text" class="form-control" name="booking_code" 
+                               placeholder="输入预订凭据，如: AB123456" required>
+                    </div>
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-info w-100">
+                            <i class="bi bi-search"></i> 查询
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="row">
     {% for restaurant in restaurants %}
     <div class="col-md-6 col-lg-4 mb-4">

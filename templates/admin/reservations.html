@@ -98,13 +98,12 @@
                                 </button>
                             </form>
                             {% endif %}
-                            {% if res.status not in ['cancelled', 'completed'] %}
-                            <form method="POST" action="{{ url_for('update_reservation_status', reservation_id=res.id) }}" class="d-inline">
-                                <input type="hidden" name="status" value="cancelled">
-                                <button type="submit" class="btn btn-danger" title="取消">
-                                    <i class="bi bi-x-lg"></i>
-                                </button>
-                            </form>
+                            {% if res.status not in ['cancelled', 'completed', 'rejected'] %}
+                            <button type="button" class="btn btn-danger" title="拒绝"
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#rejectModal{{ res.id }}">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
                             {% endif %}
                             {% if res.status == 'confirmed' %}
                             <form method="POST" action="{{ url_for('update_reservation_status', reservation_id=res.id) }}" class="d-inline">
@@ -121,6 +120,42 @@
                                 data-bs-target="#detailModal{{ res.id }}">
                             <i class="bi bi-info-circle"></i>
                         </button>
+                        
+                        {% if res.status not in ['cancelled', 'completed', 'rejected'] %}
+                        <div class="modal fade" id="rejectModal{{ res.id }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">拒绝预订</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <form method="POST" action="{{ url_for('update_reservation_status', reservation_id=res.id) }}">
+                                        <input type="hidden" name="status" value="rejected">
+                                        <div class="modal-body">
+                                            <p>您确定要拒绝 <strong>{{ res.customer_name }}</strong> 的预订吗？</p>
+                                            <div class="mb-3">
+                                                <label class="form-label">拒绝理由 (将显示给客户)</label>
+                                                <textarea class="form-control" name="reject_reason" rows="3" 
+                                                          placeholder="例如：该时段已被预订，建议选择其他时间或餐桌规格..."></textarea>
+                                                <div class="form-text">系统会自动为客户推荐其他可用时段和餐桌。</div>
+                                            </div>
+                                            <div class="alert alert-info small">
+                                                <i class="bi bi-info-circle"></i> 
+                                                拒绝后，系统将自动搜索并推荐：<br>
+                                                • 同一天其他可用时段<br>
+                                                • 未来7天同一时段的可用日期<br>
+                                                • 同一时段其他可用餐桌
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                                            <button type="submit" class="btn btn-danger">确认拒绝</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
                         
                         <div class="modal fade" id="detailModal{{ res.id }}" tabindex="-1">
                             <div class="modal-dialog">

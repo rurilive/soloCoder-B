@@ -14,8 +14,26 @@
                     <p class="mb-0">您的预订已提交成功，我们将尽快与您确认。</p>
                 </div>
                 
+                <div class="card border-warning mb-4">
+                    <div class="card-header bg-warning text-dark text-center">
+                        <strong><i class="bi bi-key"></i> 请妥善保存您的预订凭据</strong>
+                    </div>
+                    <div class="card-body text-center">
+                        <h3 class="mb-0 font-monospace text-primary">
+                            <strong>{{ reservation.booking_code }}</strong>
+                        </h3>
+                        <p class="text-muted small mt-2 mb-0">
+                            此凭据用于查询预订状态，请牢记或截图保存
+                        </p>
+                    </div>
+                </div>
+                
                 <h5 class="mb-3">预订详情</h5>
                 <table class="table table-borderless">
+                    <tr>
+                        <td class="text-muted">预订凭据</td>
+                        <td><strong class="font-monospace">{{ reservation.booking_code }}</strong></td>
+                    </tr>
                     <tr>
                         <td class="text-muted">餐厅</td>
                         <td><strong>{{ restaurant.name }}</strong></td>
@@ -46,7 +64,16 @@
                     </tr>
                 </table>
                 
+                <div class="alert alert-info small">
+                    <i class="bi bi-info-circle"></i> 
+                    您可以随时使用预订凭据 
+                    <a href="{{ url_for('query_reservation') }}" class="alert-link">查询预订状态</a>
+                </div>
+                
                 <div class="d-grid gap-2">
+                    <a href="{{ url_for('query_reservation') }}" class="btn btn-outline-info">
+                        <i class="bi bi-search"></i> 查询预订状态
+                    </a>
                     <a href="{{ url_for('index') }}" class="btn btn-primary">
                         返回首页
                     </a>

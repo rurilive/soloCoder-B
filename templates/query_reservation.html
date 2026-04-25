@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block title %}查询预订{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-lg-6">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">查询预订状态</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="booking_code" class="form-label">预订凭据 *</label>
+                        <input type="text" class="form-control" id="booking_code" name="booking_code" 
+                               placeholder="例如: AB123456" required>
+                        <div class="form-text">请输入您预订时获得的8位预订凭据</div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="customer_phone" class="form-label">联系电话 (可选)</label>
+                        <input type="tel" class="form-control" id="customer_phone" name="customer_phone"
+                               placeholder="用于验证身份">
+                        <div class="form-text">输入联系电话可提高查询安全性</div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-search"></i> 查询预订
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="card-footer text-center">
+                <a href="{{ url_for('index') }}" class="text-decoration-none">返回首页</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if error %}
+<div class="row justify-content-center mt-4">
+    <div class="col-lg-6">
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle"></i> {{ error }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if reservation %}
+<div class="row justify-content-center mt-4">
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">预订详情</h5>
+                <span class="badge bg-{{ reservation.status_class }} fs-6">
+                    {{ reservation.status_display }}
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <table class="table table-borderless table-sm">
+                            <tr>
+                                <td class="text-muted">预订凭据</td>
+                                <td><strong>{{ reservation.booking_code }}</strong></td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">客户姓名</td>
+                                <td>{{ reservation.customer_name }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">联系电话</td>
+                                <td>{{ reservation.customer_phone }}</td>
+                            </tr>
+                            {% if reservation.customer_email %}
+                            <tr>
+                                <td class="text-muted">电子邮箱</td>
+                                <td>{{ reservation.customer_email }}</td>
+                            </tr>
+                            {% endif %}
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-borderless table-sm">
+                            <tr>
+                                <td class="text-muted">餐厅</td>
+                                <td>{{ reservation.table.restaurant.name }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">桌号</td>
+                                <td>{{ reservation.table.table_number }} 号桌</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">用餐人数</td>
+                                <td>{{ reservation.guest_count }} 人</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">座位容量</td>
+                                <td>{{ reservation.table.capacity }} 人</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="card mb-4">
+                    <div class="card-body text-center bg-light">
+                        <h5 class="mb-1">
+                            <i class="bi bi-calendar-date"></i> {{ reservation.reservation_date }}
+                        </h5>
+                        <p class="mb-0">
+                            <i class="bi bi-clock"></i> {{ reservation.start_time.strftime('%H:%M') }} - {{ reservation.end_time.strftime('%H:%M') }}
+                        </p>
+                    </div>
+                </div>
+                
+                {% if reservation.notes %}
+                <div class="alert alert-info">
+                    <strong>备注：</strong> {{ reservation.notes }}
+                </div>
+                {% endif %}
+                
+                {% if reservation.status == 'rejected' %}
+                <div class="alert alert-danger">
+                    <h6 class="alert-heading"><i class="bi bi-x-circle"></i> 预订被拒绝</h6>
+                    {% if reservation.reject_reason %}
+                    <p class="mb-0">{{ reservation.reject_reason }}</p>
+                    {% else %}
+                    <p class="mb-0">商家未提供具体原因。</p>
+                    {% endif %}
+                </div>
+                
+                {% if recommendations %}
+                <div class="card border-info">
+                    <div class="card-header bg-info text-white">
+                        <h6 class="mb-0"><i class="bi bi-lightbulb"></i> 推荐方案</h6>
+                    </div>
+                    <div class="card-body">
+                        {% if recommendations.alternative_times %}
+                        <div class="mb-4">
+                            <h6 class="text-primary"><i class="bi bi-clock"></i> 其他可用时段</h6>
+                            <div class="row">
+                                {% for time in recommendations.alternative_times %}
+                                <div class="col-md-4 mb-2">
+                                    <div class="card border-primary">
+                                        <div class="card-body py-2 px-3">
+                                            <strong>{{ time.time }} - {{ time.end_time }}</strong>
+                                            <small class="text-muted d-block">{{ time.tables_available }} 桌可用</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if recommendations.alternative_dates %}
+                        <div class="mb-4">
+                            <h6 class="text-primary"><i class="bi bi-calendar3"></i> 其他可用日期</h6>
+                            <div class="row">
+                                {% for dt in recommendations.alternative_dates %}
+                                <div class="col-md-4 mb-2">
+                                    <div class="card border-primary">
+                                        <div class="card-body py-2 px-3">
+                                            <strong>{{ dt.date }}</strong>
+                                            <small class="text-muted d-block">{{ dt.weekday }} · {{ dt.tables_available }} 桌可用</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if recommendations.alternative_tables %}
+                        <div>
+                            <h6 class="text-primary"><i class="bi bi-table"></i> 其他可用餐桌</h6>
+                            <div class="row">
+                                {% for table in recommendations.alternative_tables %}
+                                <div class="col-md-4 mb-2">
+                                    <div class="card border-primary">
+                                        <div class="card-body py-2 px-3">
+                                            <strong>{{ table.table_number }} 号桌</strong>
+                                            <small class="text-muted d-block">可容纳 {{ table.capacity }} 人</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="mt-4 text-center">
+                            <a href="{{ url_for('index') }}" class="btn btn-primary">
+                                <i class="bi bi-calendar-plus"></i> 重新预订
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

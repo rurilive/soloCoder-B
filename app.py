@@ -141,8 +141,12 @@ def make_reservation(restaurant_id):
         start_time=start_time,
         end_time=end_time,
         notes=notes,
-        status='pending'
+        status='pending',
+        booking_code=Reservation.generate_booking_code()
     )
+    
+    while Reservation.query.filter_by(booking_code=reservation.booking_code).first():
+        reservation.booking_code = Reservation.generate_booking_code()
     
     db.session.add(reservation)
     db.session.commit()
@@ -387,15 +391,125 @@ def admin_reservations():
 def update_reservation_status(reservation_id):
     reservation = Reservation.query.get_or_404(reservation_id)
     new_status = request.form.get('status')
+    reject_reason = request.form.get('reject_reason', '')
     
-    if new_status in ['pending', 'confirmed', 'cancelled', 'completed']:
+    valid_statuses = ['pending', 'confirmed', 'cancelled', 'completed', 'rejected']
+    
+    if new_status in valid_statuses:
         reservation.status = new_status
+        
+        if new_status == 'rejected':
+            reservation.reject_reason = reject_reason
+            recommendations = generate_recommendations(reservation)
+            reservation.recommendation_suggestions = str(recommendations)
+        
         db.session.commit()
         flash(f'预订状态已更新为 {reservation.status_display}', 'success')
     else:
         flash('无效的状态', 'danger')
     
     return redirect(url_for('admin_reservations'))
+
+def generate_recommendations(reservation):
+    recommendations = {
+        'alternative_times': [],
+        'alternative_tables': [],
+        'alternative_dates': []
+    }
+    
+    restaurant = reservation.table.restaurant
+    original_date = reservation.reservation_date
+    original_start = reservation.start_time
+    original_end = reservation.end_time
+    original_guest_count = reservation.guest_count
+    
+    time_slots = get_time_slots(restaurant.id, original_date)
+    for slot in time_slots:
+        if slot == original_start:
+            continue
+        end_dt = datetime.combine(original_date, slot) + timedelta(hours=2)
+        end_time = end_dt.time()
+        
+        available_tables = get_available_tables(
+            restaurant.id,
+            original_date,
+            slot,
+            end_time,
+            original_guest_count
+        )
+        
+        if available_tables:
+            recommendations['alternative_times'].append({
+                'time': slot.strftime('%H:%M'),
+                'end_time': end_time.strftime('%H:%M'),
+                'tables_available': len(available_tables)
+            })
+    
+    for days_offset in range(1, 8):
+        alt_date = original_date + timedelta(days=days_offset)
+        alt_end = (datetime.combine(alt_date, original_start) + timedelta(hours=2)).time()
+        
+        available_tables = get_available_tables(
+            restaurant.id,
+            alt_date,
+            original_start,
+            alt_end,
+            original_guest_count
+        )
+        
+        if available_tables:
+            recommendations['alternative_dates'].append({
+                'date': alt_date.isoformat(),
+                'weekday': ['周一', '周二', '周三', '周四', '周五', '周六', '周日'][alt_date.weekday()],
+                'tables_available': len(available_tables)
+            })
+    
+    all_tables = Table.query.filter_by(
+        restaurant_id=restaurant.id,
+        is_active=True
+    ).all()
+    
+    for table in all_tables:
+        if table.id == reservation.table_id:
+            continue
+        if table.is_available(original_date, original_start, original_end):
+            recommendations['alternative_tables'].append({
+                'table_number': table.table_number,
+                'capacity': table.capacity
+            })
+    
+    return recommendations
+
+@app.route('/reservation/query', methods=['GET', 'POST'])
+def query_reservation():
+    reservation = None
+    error = None
+    recommendations = None
+    
+    if request.method == 'POST':
+        booking_code = request.form.get('booking_code', '').upper().strip()
+        customer_phone = request.form.get('customer_phone', '').strip()
+        
+        if not booking_code:
+            error = '请输入预订凭据'
+        else:
+            reservation = Reservation.query.filter_by(booking_code=booking_code).first()
+            
+            if not reservation:
+                error = '未找到该预订，请检查预订凭据是否正确'
+            elif customer_phone and reservation.customer_phone != customer_phone:
+                error = '联系电话与预订信息不匹配'
+            else:
+                if reservation.status == 'rejected' and reservation.recommendation_suggestions:
+                    try:
+                        recommendations = eval(reservation.recommendation_suggestions)
+                    except:
+                        recommendations = None
+    
+    return render_template('query_reservation.html',
+                           reservation=reservation,
+                           error=error,
+                           recommendations=recommendations)
 
 @app.route('/admin/calendar')
 @login_required
@@ -425,7 +539,8 @@ def calendar_data():
             'pending': '#ffc107',
             'confirmed': '#28a745',
             'cancelled': '#dc3545',
-            'completed': '#6c757d'
+            'completed': '#6c757d',
+            'rejected': '#dc3545'
         }
         
         events.append({

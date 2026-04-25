@@ -2,6 +2,8 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
+import random
+import string
 
 db = SQLAlchemy()
 
@@ -61,6 +63,9 @@ class Reservation(db.Model):
     end_time = db.Column(db.Time, nullable=False)
     status = db.Column(db.String(20), default='pending')
     notes = db.Column(db.Text)
+    booking_code = db.Column(db.String(12), unique=True, nullable=False)
+    reject_reason = db.Column(db.Text)
+    recommendation_suggestions = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -68,6 +73,15 @@ class Reservation(db.Model):
     STATUS_CONFIRMED = 'confirmed'
     STATUS_CANCELLED = 'cancelled'
     STATUS_COMPLETED = 'completed'
+    STATUS_REJECTED = 'rejected'
+
+    @staticmethod
+    def generate_booking_code():
+        letters = string.ascii_uppercase
+        digits = string.digits
+        part1 = ''.join(random.choices(letters, k=2))
+        part2 = ''.join(random.choices(digits, k=6))
+        return f"{part1}{part2}"
 
     @property
     def status_display(self):
@@ -75,7 +89,8 @@ class Reservation(db.Model):
             'pending': '待确认',
             'confirmed': '已确认',
             'cancelled': '已取消',
-            'completed': '已完成'
+            'completed': '已完成',
+            'rejected': '已拒绝'
         }
         return status_map.get(self.status, self.status)
 
@@ -85,6 +100,7 @@ class Reservation(db.Model):
             'pending': 'warning',
             'confirmed': 'success',
             'cancelled': 'danger',
-            'completed': 'secondary'
+            'completed': 'secondary',
+            'rejected': 'danger'
         }
         return status_map.get(self.status, 'secondary')

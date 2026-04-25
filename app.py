@@ -1,6 +1,8 @@
 import os
 import random
 import socket
+import re
+import json
 from datetime import datetime, date, time, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
@@ -19,9 +21,58 @@ login_manager.init_app(app)
 login_manager.login_view = 'admin_login'
 login_manager.login_message = '请先登录'
 
+BOOKING_CODE_PATTERN = re.compile(r'^[A-Z]{2}\d{6}$')
+DATE_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+TIME_PATTERN = re.compile(r'^\d{2}:\d{2}$')
+
+def is_valid_booking_code(code):
+    if not code:
+        return False
+    return bool(BOOKING_CODE_PATTERN.match(code))
+
+def is_valid_date(date_str):
+    if not date_str or not DATE_PATTERN.match(date_str):
+        return False
+    try:
+        datetime.strptime(date_str, '%Y-%m-%d').date()
+        return True
+    except ValueError:
+        return False
+
+def is_valid_time(time_str):
+    if not time_str or not TIME_PATTERN.match(time_str):
+        return False
+    try:
+        datetime.strptime(time_str, '%H:%M').time()
+        return True
+    except ValueError:
+        return False
+
+def safe_parse_int(value, default=0, min_val=None, max_val=None):
+    try:
+        num = int(value)
+        if min_val is not None and num < min_val:
+            return default
+        if max_val is not None and num > max_val:
+            return default
+        return num
+    except (TypeError, ValueError):
+        return default
+
+def safe_parse_recommendations(data_str):
+    if not data_str:
+        return None
+    try:
+        if data_str.startswith('{'):
+            return json.loads(data_str)
+        else:
+            return None
+    except json.JSONDecodeError:
+        return None
+
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return User.query.get(safe_parse_int(user_id, default=0))
 
 def get_available_tables(restaurant_id, reservation_date, start_time, end_time, guest_count=None):
     restaurant = Restaurant.query.get(restaurant_id)
@@ -74,10 +125,31 @@ def check_availability(restaurant_id):
     if request.method == 'POST':
         reservation_date_str = request.form.get('reservation_date')
         start_time_str = request.form.get('start_time')
-        guest_count = int(request.form.get('guest_count', 1))
+        guest_count_raw = request.form.get('guest_count', '1')
         
-        reservation_date = datetime.strptime(reservation_date_str, '%Y-%m-%d').date()
-        start_time = datetime.strptime(start_time_str, '%H:%M').time()
+        errors = []
+        
+        if not reservation_date_str or not is_valid_date(reservation_date_str):
+            errors.append('请选择有效的日期')
+        
+        if not start_time_str or not is_valid_time(start_time_str):
+            errors.append('请选择有效的时间')
+        
+        guest_count = safe_parse_int(guest_count_raw, default=1, min_val=1, max_val=20)
+        if guest_count < 1:
+            errors.append('用餐人数至少为1人')
+        
+        if errors:
+            for error in errors:
+                flash(error, 'danger')
+            return redirect(url_for('check_availability', restaurant_id=restaurant_id))
+        
+        try:
+            reservation_date = datetime.strptime(reservation_date_str, '%Y-%m-%d').date()
+            start_time = datetime.strptime(start_time_str, '%H:%M').time()
+        except ValueError:
+            flash('日期或时间格式错误', 'danger')
+            return redirect(url_for('check_availability', restaurant_id=restaurant_id))
         
         end_dt = datetime.combine(reservation_date, start_time) + timedelta(hours=2)
         end_time = end_dt.time()
@@ -108,28 +180,80 @@ def check_availability(restaurant_id):
 def make_reservation(restaurant_id):
     restaurant = Restaurant.query.get_or_404(restaurant_id)
     
-    table_id = request.form.get('table_id')
-    customer_name = request.form.get('customer_name')
-    customer_phone = request.form.get('customer_phone')
-    customer_email = request.form.get('customer_email', '')
-    guest_count = int(request.form.get('guest_count', 1))
+    table_id_raw = request.form.get('table_id')
+    customer_name = request.form.get('customer_name', '').strip()
+    customer_phone = request.form.get('customer_phone', '').strip()
+    customer_email = request.form.get('customer_email', '').strip()
+    guest_count_raw = request.form.get('guest_count', '1')
     reservation_date_str = request.form.get('reservation_date')
     start_time_str = request.form.get('start_time')
     end_time_str = request.form.get('end_time')
-    notes = request.form.get('notes', '')
+    notes = request.form.get('notes', '').strip()
     
-    reservation_date = datetime.strptime(reservation_date_str, '%Y-%m-%d').date()
-    start_time = datetime.strptime(start_time_str, '%H:%M').time()
-    end_time = datetime.strptime(end_time_str, '%H:%M').time()
+    errors = []
+    
+    table_id = safe_parse_int(table_id_raw, default=0, min_val=1)
+    if table_id < 1:
+        errors.append('请选择有效的餐桌')
+    
+    if not customer_name or len(customer_name) < 1 or len(customer_name) > 100:
+        errors.append('请输入有效的姓名（1-100字符）')
+    
+    if not customer_phone or len(customer_phone) < 5 or len(customer_phone) > 20:
+        errors.append('请输入有效的联系电话（5-20字符）')
+    
+    guest_count = safe_parse_int(guest_count_raw, default=0, min_val=1, max_val=20)
+    if guest_count < 1:
+        errors.append('用餐人数至少为1人')
+    
+    if not reservation_date_str or not is_valid_date(reservation_date_str):
+        errors.append('请选择有效的日期')
+    
+    if not start_time_str or not is_valid_time(start_time_str):
+        errors.append('请选择有效的开始时间')
+    
+    if not end_time_str or not is_valid_time(end_time_str):
+        errors.append('请选择有效的结束时间')
+    
+    if customer_email and '@' not in customer_email:
+        errors.append('电子邮箱格式无效')
+    
+    if len(notes) > 500:
+        errors.append('备注不能超过500字符')
+    
+    if errors:
+        for error in errors:
+            flash(error, 'danger')
+        return redirect(url_for('check_availability', restaurant_id=restaurant_id))
+    
+    try:
+        reservation_date = datetime.strptime(reservation_date_str, '%Y-%m-%d').date()
+        start_time = datetime.strptime(start_time_str, '%H:%M').time()
+        end_time = datetime.strptime(end_time_str, '%H:%M').time()
+    except ValueError:
+        flash('日期或时间格式错误', 'danger')
+        return redirect(url_for('check_availability', restaurant_id=restaurant_id))
     
     table = Table.query.get(table_id)
-    if not table:
+    if not table or table.restaurant_id != restaurant_id:
         flash('餐桌不存在', 'danger')
+        return redirect(url_for('check_availability', restaurant_id=restaurant_id))
+    
+    if not table.is_active:
+        flash('该餐桌已停用', 'danger')
+        return redirect(url_for('check_availability', restaurant_id=restaurant_id))
+    
+    if guest_count > table.capacity:
+        flash('用餐人数超过餐桌容量', 'danger')
         return redirect(url_for('check_availability', restaurant_id=restaurant_id))
     
     if not table.is_available(reservation_date, start_time, end_time):
         flash('该时间段已被预订，请选择其他时间', 'danger')
         return redirect(url_for('check_availability', restaurant_id=restaurant_id))
+    
+    booking_code = Reservation.generate_booking_code()
+    while Reservation.query.filter_by(booking_code=booking_code).first():
+        booking_code = Reservation.generate_booking_code()
     
     reservation = Reservation(
         table_id=table_id,
@@ -142,11 +266,8 @@ def make_reservation(restaurant_id):
         end_time=end_time,
         notes=notes,
         status='pending',
-        booking_code=Reservation.generate_booking_code()
+        booking_code=booking_code
     )
-    
-    while Reservation.query.filter_by(booking_code=reservation.booking_code).first():
-        reservation.booking_code = Reservation.generate_booking_code()
     
     db.session.add(reservation)
     db.session.commit()
@@ -162,8 +283,16 @@ def admin_login():
         return redirect(url_for('admin_dashboard'))
     
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        
+        if not username or len(username) < 1 or len(username) > 80:
+            flash('请输入有效的用户名', 'danger')
+            return redirect(url_for('admin_login'))
+        
+        if not password or len(password) < 1:
+            flash('请输入密码', 'danger')
+            return redirect(url_for('admin_login'))
         
         user = User.query.filter_by(username=username).first()
         
@@ -215,15 +344,44 @@ def admin_restaurants():
 @login_required
 def add_restaurant():
     if request.method == 'POST':
-        name = request.form.get('name')
-        address = request.form.get('address', '')
-        phone = request.form.get('phone', '')
-        description = request.form.get('description', '')
+        name = request.form.get('name', '').strip()
+        address = request.form.get('address', '').strip()
+        phone = request.form.get('phone', '').strip()
+        description = request.form.get('description', '').strip()
         open_time_str = request.form.get('open_time')
         close_time_str = request.form.get('close_time')
         
-        open_time = datetime.strptime(open_time_str, '%H:%M').time()
-        close_time = datetime.strptime(close_time_str, '%H:%M').time()
+        errors = []
+        
+        if not name or len(name) < 1 or len(name) > 100:
+            errors.append('餐厅名称必须在1-100字符之间')
+        
+        if not open_time_str or not is_valid_time(open_time_str):
+            errors.append('请输入有效的开门时间')
+        
+        if not close_time_str or not is_valid_time(close_time_str):
+            errors.append('请输入有效的关门时间')
+        
+        if phone and len(phone) > 20:
+            errors.append('电话不能超过20字符')
+        
+        if address and len(address) > 200:
+            errors.append('地址不能超过200字符')
+        
+        if description and len(description) > 1000:
+            errors.append('描述不能超过1000字符')
+        
+        if errors:
+            for error in errors:
+                flash(error, 'danger')
+            return redirect(url_for('add_restaurant'))
+        
+        try:
+            open_time = datetime.strptime(open_time_str, '%H:%M').time()
+            close_time = datetime.strptime(close_time_str, '%H:%M').time()
+        except ValueError:
+            flash('时间格式错误', 'danger')
+            return redirect(url_for('add_restaurant'))
         
         restaurant = Restaurant(
             name=name,
@@ -248,16 +406,51 @@ def edit_restaurant(restaurant_id):
     restaurant = Restaurant.query.get_or_404(restaurant_id)
     
     if request.method == 'POST':
-        restaurant.name = request.form.get('name')
-        restaurant.address = request.form.get('address', '')
-        restaurant.phone = request.form.get('phone', '')
-        restaurant.description = request.form.get('description', '')
-        
+        name = request.form.get('name', '').strip()
+        address = request.form.get('address', '').strip()
+        phone = request.form.get('phone', '').strip()
+        description = request.form.get('description', '').strip()
         open_time_str = request.form.get('open_time')
         close_time_str = request.form.get('close_time')
         
-        restaurant.open_time = datetime.strptime(open_time_str, '%H:%M').time()
-        restaurant.close_time = datetime.strptime(close_time_str, '%H:%M').time()
+        errors = []
+        
+        if not name or len(name) < 1 or len(name) > 100:
+            errors.append('餐厅名称必须在1-100字符之间')
+        
+        if not open_time_str or not is_valid_time(open_time_str):
+            errors.append('请输入有效的开门时间')
+        
+        if not close_time_str or not is_valid_time(close_time_str):
+            errors.append('请输入有效的关门时间')
+        
+        if phone and len(phone) > 20:
+            errors.append('电话不能超过20字符')
+        
+        if address and len(address) > 200:
+            errors.append('地址不能超过200字符')
+        
+        if description and len(description) > 1000:
+            errors.append('描述不能超过1000字符')
+        
+        if errors:
+            for error in errors:
+                flash(error, 'danger')
+            return redirect(url_for('edit_restaurant', restaurant_id=restaurant_id))
+        
+        try:
+            open_time = datetime.strptime(open_time_str, '%H:%M').time()
+            close_time = datetime.strptime(close_time_str, '%H:%M').time()
+        except ValueError:
+            flash('时间格式错误', 'danger')
+            return redirect(url_for('edit_restaurant', restaurant_id=restaurant_id))
+        
+        restaurant.name = name
+        restaurant.address = address
+        restaurant.phone = phone
+        restaurant.description = description
+        restaurant.open_time = open_time
+        restaurant.close_time = close_time
         
         db.session.commit()
         flash('餐厅信息已更新', 'success')
@@ -298,9 +491,33 @@ def admin_tables():
 @login_required
 def add_table():
     if request.method == 'POST':
-        restaurant_id = request.form.get('restaurant_id', type=int)
-        table_number = request.form.get('table_number', type=int)
-        capacity = request.form.get('capacity', type=int)
+        restaurant_id_raw = request.form.get('restaurant_id')
+        table_number_raw = request.form.get('table_number')
+        capacity_raw = request.form.get('capacity')
+        
+        errors = []
+        
+        restaurant_id = safe_parse_int(restaurant_id_raw, default=0, min_val=1)
+        if restaurant_id < 1:
+            errors.append('请选择有效的餐厅')
+        
+        table_number = safe_parse_int(table_number_raw, default=0, min_val=1)
+        if table_number < 1:
+            errors.append('桌号必须大于0')
+        
+        capacity = safe_parse_int(capacity_raw, default=0, min_val=1, max_val=50)
+        if capacity < 1:
+            errors.append('容量必须大于0')
+        
+        if errors:
+            for error in errors:
+                flash(error, 'danger')
+            return redirect(url_for('add_table'))
+        
+        restaurant = Restaurant.query.get(restaurant_id)
+        if not restaurant:
+            flash('餐厅不存在', 'danger')
+            return redirect(url_for('add_table'))
         
         existing = Table.query.filter_by(
             restaurant_id=restaurant_id, 
@@ -332,9 +549,37 @@ def edit_table(table_id):
     table = Table.query.get_or_404(table_id)
     
     if request.method == 'POST':
-        table.table_number = request.form.get('table_number', type=int)
-        table.capacity = request.form.get('capacity', type=int)
-        table.is_active = request.form.get('is_active') == 'on'
+        table_number_raw = request.form.get('table_number')
+        capacity_raw = request.form.get('capacity')
+        is_active = request.form.get('is_active') == 'on'
+        
+        errors = []
+        
+        table_number = safe_parse_int(table_number_raw, default=0, min_val=1)
+        if table_number < 1:
+            errors.append('桌号必须大于0')
+        
+        capacity = safe_parse_int(capacity_raw, default=0, min_val=1, max_val=50)
+        if capacity < 1:
+            errors.append('容量必须大于0')
+        
+        if errors:
+            for error in errors:
+                flash(error, 'danger')
+            return redirect(url_for('edit_table', table_id=table_id))
+        
+        if table_number != table.table_number:
+            existing = Table.query.filter_by(
+                restaurant_id=table.restaurant_id, 
+                table_number=table_number
+            ).first()
+            if existing:
+                flash('该桌号已存在', 'danger')
+                return redirect(url_for('edit_table', table_id=table_id))
+        
+        table.table_number = table_number
+        table.capacity = capacity
+        table.is_active = is_active
         
         db.session.commit()
         flash('餐桌信息已更新', 'success')
@@ -401,7 +646,7 @@ def update_reservation_status(reservation_id):
         if new_status == 'rejected':
             reservation.reject_reason = reject_reason
             recommendations = generate_recommendations(reservation)
-            reservation.recommendation_suggestions = str(recommendations)
+            reservation.recommendation_suggestions = json.dumps(recommendations)
         
         db.session.commit()
         flash(f'预订状态已更新为 {reservation.status_display}', 'success')
@@ -492,6 +737,8 @@ def query_reservation():
         
         if not booking_code:
             error = '请输入预订凭据'
+        elif not is_valid_booking_code(booking_code):
+            error = '预订凭据格式错误，应为2个大写字母加6个数字（如：AB123456）'
         else:
             reservation = Reservation.query.filter_by(booking_code=booking_code).first()
             
@@ -501,10 +748,7 @@ def query_reservation():
                 error = '联系电话与预订信息不匹配'
             else:
                 if reservation.status == 'rejected' and reservation.recommendation_suggestions:
-                    try:
-                        recommendations = eval(reservation.recommendation_suggestions)
-                    except:
-                        recommendations = None
+                    recommendations = safe_parse_recommendations(reservation.recommendation_suggestions)
     
     return render_template('query_reservation.html',
                            reservation=reservation,
@@ -522,8 +766,21 @@ def calendar_data():
     start_str = request.args.get('start')
     end_str = request.args.get('end')
     
-    start_date = datetime.strptime(start_str, '%Y-%m-%d').date()
-    end_date = datetime.strptime(end_str, '%Y-%m-%d').date()
+    if not start_str or not end_str or not is_valid_date(start_str) or not is_valid_date(end_str):
+        today = date.today()
+        start_date = today - timedelta(days=30)
+        end_date = today + timedelta(days=30)
+    else:
+        try:
+            start_date = datetime.strptime(start_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_str, '%Y-%m-%d').date()
+        except ValueError:
+            today = date.today()
+            start_date = today - timedelta(days=30)
+            end_date = today + timedelta(days=30)
+    
+    if start_date > end_date:
+        start_date, end_date = end_date, start_date
     
     reservations = Reservation.query.filter(
         Reservation.reservation_date >= start_date,
@@ -617,7 +874,7 @@ def find_free_port():
 
 if __name__ == '__main__':
     init_db()
-    port = find_free_port()
+    port = 33136
     print(f'服务器运行在 http://localhost:{port}')
     print(f'管理后台: http://localhost:{port}/admin')
     app.run(host='0.0.0.0', port=port, debug=True)

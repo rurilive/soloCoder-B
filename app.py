@@ -971,9 +971,14 @@ def quick_rebook(reservation_id):
         flash('该时间段已被预订，请选择其他时间', 'danger')
         return redirect(url_for('query_reservation'))
     
-    booking_code = Reservation.generate_booking_code()
-    while Reservation.query.filter_by(booking_code=booking_code).first():
-        booking_code = Reservation.generate_booking_code()
+    original_booking_code = original_reservation.booking_code
+    
+    old_booking_code = Reservation.generate_booking_code()
+    while Reservation.query.filter_by(booking_code=old_booking_code).first():
+        old_booking_code = Reservation.generate_booking_code()
+    
+    original_reservation.booking_code = old_booking_code
+    original_reservation.original_booking_code = original_booking_code
     
     new_reservation = Reservation(
         table_id=table_id,
@@ -986,14 +991,13 @@ def quick_rebook(reservation_id):
         end_time=end_time,
         notes=original_reservation.notes,
         status='pending',
-        booking_code=booking_code,
-        original_booking_code=original_reservation.booking_code
+        booking_code=original_booking_code
     )
     
     db.session.add(new_reservation)
     db.session.commit()
     
-    flash('重新预订成功！我们将尽快与您确认。', 'success')
+    flash('重新预订成功！您可以使用原预订凭据查询状态。', 'success')
     return render_template('reservation_success.html', 
                            reservation=new_reservation, 
                            restaurant=restaurant)

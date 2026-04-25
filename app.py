@@ -863,7 +863,9 @@ def generate_recommendations(reservation):
         is_active=True
     ).all()
     
-    for table in all_tables:
+    suitable_tables = [t for t in all_tables if t.capacity >= original_guest_count]
+    
+    for table in suitable_tables:
         if table.id == reservation.table_id:
             continue
         if table.is_available(original_date, original_start, original_end):

@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ form.name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .form-field {
+            transition: all 0.3s ease;
+        }
+        .form-field.hidden-field {
+            display: none;
+        }
+        .form-field.disabled-field input,
+        .form-field.disabled-field select,
+        .form-field.disabled-field textarea {
+            background-color: #f3f4f6;
+            cursor: not-allowed;
+        }
+        .error-message {
+            color: #ef4444;
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+        }
+        .input-error {
+            border-color: #ef4444 !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mx-auto px-4 py-8">
+        <div class="max-w-2xl mx-auto">
+            <div class="bg-white rounded-xl shadow-xl overflow-hidden">
+                <div class="bg-gradient-to-r from-purple-600 to-indigo-600 px-8 py-6">
+                    <h1 class="text-3xl font-bold text-white mb-2">{{ form.name }}</h1>
+                    {% if form.description %}
+                    <p class="text-purple-200">{{ form.description }}</p>
+                    {% endif %}
+                </div>
+
+                <form id="dynamicForm" class="p-8 space-y-6">
+                    <div id="formFieldsContainer"></div>
+
+                    <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200">
+                        <button type="button" onclick="window.location.href='{{ url_for('index') }}'" 
+                                class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                            返回
+                        </button>
+                        <button type="submit" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                            提交表单
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 提交结果 -->
+            <div id="resultModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+                <div class="bg-white rounded-xl w-full max-w-md p-6">
+                    <div id="resultContent"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const formData = {{ form.to_dict() | tojson }};
+        const fields = formData.schema.fields || [];
+        const validationRules = formData.validation_rules || {};
+        const linkageRules = formData.linkage_rules || {};
+        
+        let fieldStates = {};
+
+        // 初始化字段状态
+        fields.forEach(field => {
+            fieldStates[field.name] = {
+                visible: true,
+                enabled: true,
+                required: field.required || false
+            };
+        });
+
+        // 渲染表单字段
+        function renderFormFields() {
+            const container = document.getElementById('formFieldsContainer');
+            container.innerHTML = '';
+
+            fields.forEach(field => {
+                const fieldHtml = createFieldHtml(field);
+                container.innerHTML += fieldHtml;
+            });
+
+            // 添加事件监听器
+            addFieldEventListeners();
+            
+            // 应用初始联动规则
+            applyAllLinkageRules();
+        }
+
+        function createFieldHtml(field) {
+            const state = fieldStates[field.name];
+            const requiredMark = state.required ? '<span class="text-red-500 ml-1">*</span>' : '';
+            const disabledAttr = !state.enabled ? 'disabled' : '';
+            const hiddenClass = !state.visible ? 'hidden-field' : '';
+
+            let inputHtml = '';
+            
+            switch (field.type) {
+                case 'text':
+                case 'email':
+                    inputHtml = `
+                        <input type="${field.type}" 
+                               name="${field.name}" 
+                               id="field_${field.name}"
+                               placeholder="${field.placeholder || ''}" 
+                               value="${field.defaultValue || ''}"
+                               ${disabledAttr}
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    `;
+                    break;
+                case 'number':
+                    inputHtml = `
+                        <input type="number" 
+                               name="${field.name}" 
+                               id="field_${field.name}"
+                               placeholder="${field.placeholder || ''}" 
+                               value="${field.defaultValue || ''}"
+                               ${disabledAttr}
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    `;
+                    break;
+                case 'textarea':
+                    inputHtml = `
+                        <textarea name="${field.name}" 
+                                  id="field_${field.name}"
+                                  placeholder="${field.placeholder || ''}" 
+                                  rows="4"
+                                  ${disabledAttr}
+                                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">${field.defaultValue || ''}</textarea>
+                    `;
+                    break;
+                case 'select':
+                    const options = (field.options || []).map(opt => 
+                        `<option value="${opt.value}" ${field.defaultValue === opt.value ? 'selected' : ''}>${opt.label}</option>`
+                    ).join('');
+                    inputHtml = `
+                        <select name="${field.name}" 
+                                id="field_${field.name}"
+                                ${disabledAttr}
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                            <option value="">请选择...</option>
+                            ${options}
+                        </select>
+                    `;
+                    break;
+                case 'radio':
+                    inputHtml = `<div class="space-y-2">`;
+                    (field.options || []).forEach(opt => {
+                        inputHtml += `
+                            <label class="flex items-center">
+                                <input type="radio" 
+                                       name="${field.name}" 
+                                       value="${opt.value}"
+                                       ${field.defaultValue === opt.value ? 'checked' : ''}
+                                       ${disabledAttr}
+                                       class="mr-2 text-purple-600 focus:ring-purple-500">
+                                <span class="text-gray-700">${opt.label}</span>
+                            </label>
+                        `;
+                    });
+                    inputHtml += `</div>`;
+                    break;
+                case 'checkbox':
+                    inputHtml = `<div class="space-y-2">`;
+                    (field.options || []).forEach(opt => {
+                        inputHtml += `
+                            <label class="flex items-center">
+                                <input type="checkbox" 
+                                       name="${field.name}" 
+                                       value="${opt.value}"
+                                       ${disabledAttr}
+                                       class="mr-2 text-purple-600 focus:ring-purple-500 rounded">
+                                <span class="text-gray-700">${opt.label}</span>
+                            </label>
+                        `;
+                    });
+                    inputHtml += `</div>`;
+                    break;
+                case 'date':
+                    inputHtml = `
+                        <input type="date" 
+                               name="${field.name}" 
+                               id="field_${field.name}"
+                               value="${field.defaultValue || ''}"
+                               ${disabledAttr}
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    `;
+                    break;
+                case 'file':
+                    inputHtml = `
+                        <input type="file" 
+                               name="${field.name}" 
+                               id="field_${field.name}"
+                               ${disabledAttr}
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    `;
+                    break;
+            }
+
+            return `
+                <div class="form-field ${hiddenClass}" data-field-name="${field.name}">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        ${field.label}${requiredMark}
+                    </label>
+                    ${inputHtml}
+                    <div class="error-message" id="error_${field.name}" style="display: none;"></div>
+                </div>
+            `;
+        }
+
+        function addFieldEventListeners() {
+            fields.forEach(field => {
+                const element = document.getElementById(`field_${field.name}`);
+                if (element) {
+                    element.addEventListener('change', () => {
+                        onFieldValueChange(field.name);
+                    });
+                    element.addEventListener('input', () => {
+                        clearFieldError(field.name);
+                    });
+                }
+            });
+        }
+
+        function onFieldValueChange(fieldName) {
+            applyLinkageRulesForField(fieldName);
+        }
+
+        function applyAllLinkageRules() {
+            Object.keys(linkageRules).forEach(fieldName => {
+                applyLinkageRulesForField(fieldName);
+            });
+        }
+
+        function applyLinkageRulesForField(triggerFieldName) {
+            const rules = linkageRules[triggerFieldName] || [];
+            
+            rules.forEach(rule => {
+                const triggerValue = getFieldValue(rule.triggerField);
+                const conditionMet = evaluateCondition(rule.condition, triggerValue, rule.triggerValue);
+                
+                applyRuleAction(rule, conditionMet);
+            });
+            
+            updateFormVisibility();
+        }
+
+        function getFieldValue(fieldName) {
+            const element = document.getElementById(`field_${fieldName}`);
+            if (!element) return null;
+            
+            if (element.type === 'checkbox' || element.type === 'radio') {
+                const checked = document.querySelector(`input[name="${fieldName}"]:checked`);
+                return checked ? checked.value : '';
+            }
+            
+            return element.value;
+        }
+
+        function evaluateCondition(condition, currentValue, triggerValue) {
+            switch (condition) {
+                case 'equals':
+                    return currentValue === triggerValue;
+                case 'notEquals':
+                    return currentValue !== triggerValue;
+                case 'contains':
+                    return String(currentValue).includes(triggerValue);
+                case 'isEmpty':
+                    return currentValue === '' || currentValue === null || currentValue === undefined;
+                case 'isNotEmpty':
+                    return currentValue !== '' && currentValue !== null && currentValue !== undefined;
+                default:
+                    return false;
+            }
+        }
+
+        function applyRuleAction(rule, conditionMet) {
+            const targetField = rule.targetField;
+            if (!fieldStates[targetField]) return;
+
+            switch (rule.action) {
+                case 'show':
+                    fieldStates[targetField].visible = conditionMet;
+                    break;
+                case 'hide':
+                    fieldStates[targetField].visible = !conditionMet;
+                    break;
+                case 'enable':
+                    fieldStates[targetField].enabled = conditionMet;
+                    break;
+                case 'disable':
+                    fieldStates[targetField].enabled = !conditionMet;
+                    break;
+                case 'setRequired':
+                    fieldStates[targetField].required = conditionMet;
+                    break;
+            }
+        }
+
+        function updateFormVisibility() {
+            Object.keys(fieldStates).forEach(fieldName => {
+                const state = fieldStates[fieldName];
+                const fieldElement = document.querySelector(`[data-field-name="${fieldName}"]`);
+                
+                if (fieldElement) {
+                    // 更新可见性
+                    if (state.visible) {
+                        fieldElement.classList.remove('hidden-field');
+                    } else {
+                        fieldElement.classList.add('hidden-field');
+                    }
+                    
+                    // 更新禁用状态
+                    const inputElement = document.getElementById(`field_${fieldName}`);
+                    if (inputElement) {
+                        if (state.enabled) {
+                            inputElement.removeAttribute('disabled');
+                            fieldElement.classList.remove('disabled-field');
+                        } else {
+                            inputElement.setAttribute('disabled', 'disabled');
+                            fieldElement.classList.add('disabled-field');
+                        }
+                    }
+                    
+                    // 更新必填标记
+                    const labelElement = fieldElement.querySelector('label');
+                    if (labelElement) {
+                        const existingStar = labelElement.querySelector('.text-red-500');
+                        if (state.required && !existingStar) {
+                            labelElement.innerHTML += '<span class="text-red-500 ml-1">*</span>';
+                        } else if (!state.required && existingStar) {
+                            existingStar.remove();
+                        }
+                    }
+                }
+            });
+        }
+
+        function clearFieldError(fieldName) {
+            const errorElement = document.getElementById(`error_${fieldName}`);
+            const inputElement = document.getElementById(`field_${fieldName}`);
+            
+            if (errorElement) {
+                errorElement.style.display = 'none';
+                errorElement.textContent = '';
+            }
+            if (inputElement) {
+                inputElement.classList.remove('input-error');
+            }
+        }
+
+        function showFieldError(fieldName, message) {
+            const errorElement = document.getElementById(`error_${fieldName}`);
+            const inputElement = document.getElementById(`field_${fieldName}`);
+            
+            if (errorElement) {
+                errorElement.textContent = message;
+                errorElement.style.display = 'block';
+            }
+            if (inputElement) {
+                inputElement.classList.add('input-error');
+            }
+        }
+
+        function validateForm() {
+            let isValid = true;
+            const formData = collectFormData();
+
+            // 清除所有错误
+            fields.forEach(field => {
+                clearFieldError(field.name);
+            });
+
+            // 验证每个字段
+            fields.forEach(field => {
+                const state = fieldStates[field.name];
+                
+                // 跳过隐藏字段
+                if (!state.visible) return;
+
+                const rules = validationRules[field.name] || {};
+                const value = formData[field.name];
+
+                // 必填验证
+                if (state.required) {
+                    if (value === undefined || value === null || value === '' || 
+                        (Array.isArray(value) && value.length === 0)) {
+                        showFieldError(field.name, '此字段为必填项');
+                        isValid = false;
+                        return;
+                    }
+                }
+
+                // 如果没有值，跳过其他验证
+                if (!value && value !== 0) return;
+
+                // 数字验证
+                if (field.type === 'number') {
+                    const numValue = parseFloat(value);
+                    if (isNaN(numValue)) {
+                        showFieldError(field.name, '请输入有效的数字');
+                        isValid = false;
+                        return;
+                    }
+
+                    if (rules.min !== undefined && numValue < parseFloat(rules.min)) {
+                        showFieldError(field.name, `最小值为 ${rules.min}`);
+                        isValid = false;
+                        return;
+                    }
+
+                    if (rules.max !== undefined && numValue > parseFloat(rules.max)) {
+                        showFieldError(field.name, `最大值为 ${rules.max}`);
+                        isValid = false;
+                        return;
+                    }
+                }
+
+                // 文本验证
+                if (['text', 'email', 'textarea'].includes(field.type)) {
+                    const strValue = String(value);
+
+                    if (rules.minLength !== undefined && strValue.length < parseInt(rules.minLength)) {
+                        showFieldError(field.name, `最小长度为 ${rules.minLength}`);
+                        isValid = false;
+                        return;
+                    }
+
+                    if (rules.maxLength !== undefined && strValue.length > parseInt(rules.maxLength)) {
+                        showFieldError(field.name, `最大长度为 ${rules.maxLength}`);
+                        isValid = false;
+                        return;
+                    }
+
+                    if (rules.pattern) {
+                        try {
+                            const regex = new RegExp(rules.pattern);
+                            if (!regex.test(strValue)) {
+                                showFieldError(field.name, rules.pattern_message || '格式不正确');
+                                isValid = false;
+                                return;
+                            }
+                        } catch (e) {
+                            console.error('Invalid regex pattern:', e);
+                        }
+                    }
+                }
+
+                // 邮箱验证
+                if (field.type === 'email') {
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailRegex.test(String(value))) {
+                        showFieldError(field.name, '请输入有效的邮箱地址');
+                        isValid = false;
+                        return;
+                    }
+                }
+            });
+
+            return { isValid, formData };
+        }
+
+        function collectFormData() {
+            const data = {};
+            
+            fields.forEach(field => {
+                const state = fieldStates[field.name];
+                if (!state.visible) return;
+
+                const elements = document.getElementsByName(field.name);
+                if (elements.length === 0) return;
+
+                if (elements[0].type === 'checkbox') {
+                    data[field.name] = [];
+                    elements.forEach(el => {
+                        if (el.checked) {
+                            data[field.name].push(el.value);
+                        }
+                    });
+                } else if (elements[0].type === 'radio') {
+                    const checked = document.querySelector(`input[name="${field.name}"]:checked`);
+                    data[field.name] = checked ? checked.value : '';
+                } else if (elements[0].type === 'file') {
+                    // 文件上传暂不处理，只记录文件名
+                    data[field.name] = elements[0].files[0]?.name || '';
+                } else {
+                    data[field.name] = elements[0].value;
+                }
+            });
+
+            return data;
+        }
+
+        async function submitForm(formData) {
+            try {
+                const response = await fetch(`/api/forms/{{ form.id }}/submit`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showResult(true, `表单提交成功！提交ID: ${result.submission_id}`);
+                } else {
+                    if (result.errors) {
+                        // 显示字段错误
+                        Object.keys(result.errors).forEach(fieldName => {
+                            showFieldError(fieldName, result.errors[fieldName]);
+                        });
+                    }
+                    showResult(false, result.message || '提交失败，请检查表单');
+                }
+            } catch (error) {
+                console.error('Submit error:', error);
+                showResult(false, '提交失败，请稍后重试');
+            }
+        }
+
+        function showResult(success, message) {
+            const modal = document.getElementById('resultModal');
+            const content = document.getElementById('resultContent');
+            
+            const icon = success ? 'fa-check-circle text-green-500' : 'fa-exclamation-circle text-red-500';
+            const title = success ? '提交成功' : '提交失败';
+            
+            content.innerHTML = `
+                <div class="text-center">
+                    <i class="fas ${icon} text-5xl mb-4"></i>
+                    <h3 class="text-xl font-bold text-gray-800 mb-2">${title}</h3>
+                    <p class="text-gray-600 mb-6">${message}</p>
+                    <div class="flex justify-center space-x-4">
+                        <button onclick="closeResultModal()" 
+                                class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                            关闭
+                        </button>
+                        ${success ? `
+                            <button onclick="window.location.reload()" 
+                                    class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                                再次提交
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+            
+            modal.classList.remove('hidden');
+        }
+
+        function closeResultModal() {
+            document.getElementById('resultModal').classList.add('hidden');
+        }
+
+        // 表单提交事件
+        document.getElementById('dynamicForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const { isValid, formData } = validateForm();
+            
+            if (isValid) {
+                await submitForm(formData);
+            }
+        });
+
+        // 点击模态框外部关闭
+        document.getElementById('resultModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeResultModal();
+            }
+        });
+
+        // 初始化渲染
+        renderFormFields();
+    </script>
+</body>
+</html>

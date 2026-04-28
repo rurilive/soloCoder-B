@@ -1,0 +1,16 @@
+[project]
+name = "solocoder-b"
+version = "0.1.0"
+description = "低代码平台 - 可视化拖拽生成表单，配置校验和联动规则"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "flask>=3.0.0",
+    "flask-sqlalchemy>=3.1.0",
+    "playwright>=1.40.0",
+    "json5>=0.9.25",
+    "jsonschema>=4.20.0",
+]
+
+[tool.uv]
+python-preference = "system"

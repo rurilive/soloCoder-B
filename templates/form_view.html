@@ -75,6 +75,7 @@
         const linkageRules = formData.linkage_rules || {};
         
         let fieldStates = {};
+        let triggerFieldMap = {};
 
         // 初始化字段状态
         fields.forEach(field => {
@@ -85,10 +86,42 @@
             };
         });
 
+        // 构建触发字段到规则的映射
+        function buildTriggerFieldMap() {
+            triggerFieldMap = {};
+            
+            // linkageRules 的结构是: {targetField: [rules]}
+            Object.keys(linkageRules).forEach(targetField => {
+                const rules = linkageRules[targetField] || [];
+                rules.forEach(rule => {
+                    const triggerField = rule.triggerField;
+                    if (!triggerFieldMap[triggerField]) {
+                        triggerFieldMap[triggerField] = [];
+                    }
+                    triggerFieldMap[triggerField].push(rule);
+                });
+            });
+        }
+
+        // 获取所有受影响的目标字段（用于初始化状态）
+        function getAffectedTargetFields() {
+            const affectedFields = new Set();
+            Object.keys(linkageRules).forEach(targetField => {
+                const rules = linkageRules[targetField] || [];
+                rules.forEach(rule => {
+                    affectedFields.add(rule.targetField);
+                });
+            });
+            return Array.from(affectedFields);
+        }
+
         // 渲染表单字段
         function renderFormFields() {
             const container = document.getElementById('formFieldsContainer');
             container.innerHTML = '';
+
+            // 构建触发字段映射
+            buildTriggerFieldMap();
 
             fields.forEach(field => {
                 const fieldHtml = createFieldHtml(field);
@@ -242,19 +275,63 @@
         }
 
         function applyAllLinkageRules() {
-            Object.keys(linkageRules).forEach(fieldName => {
-                applyLinkageRulesForField(fieldName);
+            Object.keys(triggerFieldMap).forEach(triggerFieldName => {
+                applyLinkageRulesForField(triggerFieldName);
             });
         }
 
         function applyLinkageRulesForField(triggerFieldName) {
-            const rules = linkageRules[triggerFieldName] || [];
+            const rules = triggerFieldMap[triggerFieldName] || [];
+            
+            if (rules.length === 0) return;
+
+            const targetFieldUpdates = {};
             
             rules.forEach(rule => {
                 const triggerValue = getFieldValue(rule.triggerField);
                 const conditionMet = evaluateCondition(rule.condition, triggerValue, rule.triggerValue);
                 
-                applyRuleAction(rule, conditionMet);
+                const targetField = rule.targetField;
+                if (!targetFieldUpdates[targetField]) {
+                    targetFieldUpdates[targetField] = {
+                        visible: null,
+                        enabled: null,
+                        required: null
+                    };
+                }
+                
+                switch (rule.action) {
+                    case 'show':
+                        targetFieldUpdates[targetField].visible = conditionMet;
+                        break;
+                    case 'hide':
+                        targetFieldUpdates[targetField].visible = !conditionMet;
+                        break;
+                    case 'enable':
+                        targetFieldUpdates[targetField].enabled = conditionMet;
+                        break;
+                    case 'disable':
+                        targetFieldUpdates[targetField].enabled = !conditionMet;
+                        break;
+                    case 'setRequired':
+                        targetFieldUpdates[targetField].required = conditionMet;
+                        break;
+                }
+            });
+
+            Object.keys(targetFieldUpdates).forEach(targetField => {
+                const updates = targetFieldUpdates[targetField];
+                if (!fieldStates[targetField]) return;
+                
+                if (updates.visible !== null) {
+                    fieldStates[targetField].visible = updates.visible;
+                }
+                if (updates.enabled !== null) {
+                    fieldStates[targetField].enabled = updates.enabled;
+                }
+                if (updates.required !== null) {
+                    fieldStates[targetField].required = updates.required;
+                }
             });
             
             updateFormVisibility();
@@ -273,17 +350,20 @@
         }
 
         function evaluateCondition(condition, currentValue, triggerValue) {
+            const currentStr = String(currentValue);
+            const triggerStr = String(triggerValue);
+            
             switch (condition) {
                 case 'equals':
-                    return currentValue === triggerValue;
+                    return currentStr === triggerStr;
                 case 'notEquals':
-                    return currentValue !== triggerValue;
+                    return currentStr !== triggerStr;
                 case 'contains':
-                    return String(currentValue).includes(triggerValue);
+                    return currentStr.includes(triggerStr);
                 case 'isEmpty':
-                    return currentValue === '' || currentValue === null || currentValue === undefined;
+                    return currentStr === '' || currentStr === 'null' || currentStr === 'undefined';
                 case 'isNotEmpty':
-                    return currentValue !== '' && currentValue !== null && currentValue !== undefined;
+                    return currentStr !== '' && currentStr !== 'null' && currentStr !== 'undefined';
                 default:
                     return false;
             }

@@ -109,7 +109,7 @@ def get_available_tables(restaurant_id, reservation_date, start_time, end_time, 
     
     tables = Table.query.filter_by(restaurant_id=restaurant_id, is_active=True).all()
     
-    if guest_count:
+    if guest_count is not None and guest_count > 0:
         tables = [t for t in tables if t.capacity >= guest_count]
     
     available_tables = []
@@ -831,6 +831,7 @@ def generate_recommendations(reservation):
                 'tables_available': len(available_tables),
                 'table_id': first_table.id,
                 'table_number': first_table.table_number,
+                'capacity': first_table.capacity,
                 'date': original_date.isoformat()
             })
     
@@ -854,6 +855,7 @@ def generate_recommendations(reservation):
                 'tables_available': len(available_tables),
                 'table_id': first_table.id,
                 'table_number': first_table.table_number,
+                'capacity': first_table.capacity,
                 'start_time': original_start.strftime('%H:%M'),
                 'end_time': alt_end.strftime('%H:%M')
             })

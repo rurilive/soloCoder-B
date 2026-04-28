@@ -73,7 +73,7 @@ def safe_parse_recommendations(data_str):
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(safe_parse_int(user_id, default=0))
+    return db.session.get(User, safe_parse_int(user_id, default=0))
 
 def admin_required(f):
     @wraps(f)
@@ -103,7 +103,7 @@ def can_manage_restaurant(restaurant_id):
     return False
 
 def get_available_tables(restaurant_id, reservation_date, start_time, end_time, guest_count=None):
-    restaurant = Restaurant.query.get(restaurant_id)
+    restaurant = db.session.get(Restaurant, restaurant_id)
     if not restaurant:
         return []
     
@@ -120,7 +120,7 @@ def get_available_tables(restaurant_id, reservation_date, start_time, end_time, 
     return available_tables
 
 def get_time_slots(restaurant_id, reservation_date):
-    restaurant = Restaurant.query.get(restaurant_id)
+    restaurant = db.session.get(Restaurant, restaurant_id)
     if not restaurant:
         return []
     
@@ -262,7 +262,7 @@ def make_reservation(restaurant_id):
         flash('日期或时间格式错误', 'danger')
         return redirect(url_for('check_availability', restaurant_id=restaurant_id))
     
-    table = Table.query.get(table_id)
+    table = db.session.get(Table, table_id)
     if not table or table.restaurant_id != restaurant_id:
         flash('餐桌不存在', 'danger')
         return redirect(url_for('check_availability', restaurant_id=restaurant_id))
@@ -428,7 +428,7 @@ def add_restaurant():
         
         store_manager_id = safe_parse_int(store_manager_id_raw, default=None)
         if store_manager_id is not None:
-            store_manager = User.query.get(store_manager_id)
+            store_manager = db.session.get(User, store_manager_id)
             if not store_manager or not store_manager.is_store_manager:
                 errors.append('请选择有效的店长')
         
@@ -505,7 +505,7 @@ def edit_restaurant(restaurant_id):
             store_manager_id_raw = request.form.get('store_manager_id')
             store_manager_id = safe_parse_int(store_manager_id_raw, default=None)
             if store_manager_id is not None:
-                store_manager = User.query.get(store_manager_id)
+                store_manager = db.session.get(User, store_manager_id)
                 if not store_manager or not store_manager.is_store_manager:
                     errors.append('请选择有效的店长')
         else:
@@ -568,7 +568,7 @@ def admin_tables():
             return redirect(url_for('admin_tables'))
         
         tables = Table.query.filter_by(restaurant_id=restaurant_id).all()
-        restaurant = Restaurant.query.get(restaurant_id)
+        restaurant = db.session.get(Restaurant, restaurant_id)
     else:
         if current_user.is_admin:
             tables = Table.query.all()
@@ -622,7 +622,7 @@ def add_table():
                 flash(error, 'danger')
             return redirect(url_for('add_table'))
         
-        restaurant = Restaurant.query.get(restaurant_id)
+        restaurant = db.session.get(Restaurant, restaurant_id)
         if not restaurant:
             flash('餐厅不存在', 'danger')
             return redirect(url_for('add_table'))
@@ -956,8 +956,8 @@ def quick_rebook(reservation_id):
         flash('日期或时间格式错误', 'danger')
         return redirect(url_for('query_reservation'))
     
-    table = Table.query.get(table_id)
-    restaurant = Restaurant.query.get(original_reservation.table.restaurant_id)
+    table = db.session.get(Table, table_id)
+    restaurant = db.session.get(Restaurant, original_reservation.table.restaurant_id)
     
     if not table or table.restaurant_id != restaurant.id:
         flash('餐桌不存在', 'danger')

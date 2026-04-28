@@ -11,13 +11,16 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
         }
-        .screenshot-container {
-            max-height: 400px;
+        .code-block {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            background-color: #1f2937;
+            color: #e5e7eb;
+            padding: 16px;
+            border-radius: 8px;
+            max-height: 500px;
             overflow: auto;
-        }
-        .screenshot-container img {
-            max-width: 100%;
-            height: auto;
         }
         .step-log {
             font-family: monospace;
@@ -35,16 +38,15 @@
         .step-status-error {
             color: #ef4444;
         }
-        .code-block {
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            white-space: pre-wrap;
-            background-color: #1f2937;
-            color: #e5e7eb;
-            padding: 16px;
-            border-radius: 8px;
-            max-height: 500px;
-            overflow: auto;
+        .tab-button.active {
+            background-color: #667eea;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
         }
     </style>
 </head>
@@ -78,6 +80,31 @@
                 </div>
             </div>
 
+            <!-- 测试说明 -->
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                <h2 class="text-lg font-bold text-gray-800 mb-4">
+                    <i class="fas fa-info-circle mr-2 text-purple-600"></i>测试方式说明
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="p-4 bg-green-50 rounded-lg border border-green-200">
+                        <h3 class="font-bold text-green-800 mb-2">
+                            <i class="fas fa-bolt mr-2"></i>API 测试（推荐）
+                        </h3>
+                        <p class="text-sm text-green-700">
+                            直接调用后端 API 进行数据验证和提交测试。快速、稳定，不需要浏览器。
+                        </p>
+                    </div>
+                    <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <h3 class="font-bold text-blue-800 mb-2">
+                            <i class="fas fa-code mr-2"></i>生成测试代码
+                        </h3>
+                        <p class="text-sm text-blue-700">
+                            自动生成 Python 测试代码，包括 API 测试代码和 Playwright 端到端测试代码。
+                        </p>
+                    </div>
+                </div>
+            </div>
+
             <!-- 主内容区域 -->
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <!-- 左侧：测试数据配置 -->
@@ -92,9 +119,9 @@
                         </div>
 
                         <div class="mt-6 space-y-3">
-                            <button onclick="runPlaywrightTest()" 
+                            <button onclick="runApiTest()" 
                                     class="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium">
-                                <i class="fas fa-play mr-2"></i>运行 Playwright 测试
+                                <i class="fas fa-play mr-2"></i>运行 API 测试
                             </button>
                             <button onclick="generateTestCode()" 
                                     class="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium">
@@ -111,24 +138,17 @@
                         <h2 class="text-lg font-bold text-gray-800 mb-4">
                             <i class="fas fa-terminal mr-2 text-purple-600"></i>执行日志
                         </h2>
-                        <div id="testSteps" class="step-log bg-gray-50 rounded-lg p-4 min-h-[200px] max-h-[300px] overflow-y-auto">
+                        <div id="testSteps" class="step-log bg-gray-50 rounded-lg p-4 min-h-[150px] max-h-[300px] overflow-y-auto">
                             <p class="text-gray-400">运行测试后，执行日志将显示在这里...</p>
                         </div>
                     </div>
 
-                    <!-- 截图展示 -->
-                    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                    <!-- 验证结果 -->
+                    <div id="validationResult" class="bg-white rounded-xl shadow-lg p-6 mb-6 hidden">
                         <h2 class="text-lg font-bold text-gray-800 mb-4">
-                            <i class="fas fa-camera mr-2 text-purple-600"></i>测试截图
+                            <i class="fas fa-check-circle mr-2 text-purple-600"></i>验证结果
                         </h2>
-                        <div id="screenshotTabs" class="hidden mb-4">
-                            <div class="flex space-x-2 border-b border-gray-200 pb-2">
-                                <!-- 动态生成标签 -->
-                            </div>
-                        </div>
-                        <div id="screenshotContent" class="screenshot-container bg-gray-50 rounded-lg p-4 min-h-[200px] flex items-center justify-center">
-                            <p class="text-gray-400">运行测试后，截图将显示在这里...</p>
-                        </div>
+                        <div id="validationContent"></div>
                     </div>
 
                     <!-- 生成的代码 -->
@@ -137,13 +157,38 @@
                             <h2 class="text-lg font-bold text-gray-800">
                                 <i class="fas fa-file-code mr-2 text-purple-600"></i>生成的测试代码
                             </h2>
-                            <button onclick="copyTestCode()" 
+                        </div>
+
+                        <!-- 代码类型标签 -->
+                        <div class="flex space-x-2 mb-4">
+                            <button onclick="showCodeTab('api')" 
+                                    id="tabApi"
+                                    class="tab-button px-4 py-2 rounded-lg text-sm font-medium active">
+                                <i class="fas fa-bolt mr-1"></i>API 测试代码
+                            </button>
+                            <button onclick="showCodeTab('playwright')" 
+                                    id="tabPlaywright"
+                                    class="tab-button px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200">
+                                <i class="fas fa-globe mr-1"></i>Playwright 测试代码
+                            </button>
+                        </div>
+
+                        <div class="flex justify-end space-x-2 mb-3">
+                            <button onclick="copyCurrentCode()" 
                                     class="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition">
                                 <i class="fas fa-copy mr-1"></i>复制代码
                             </button>
+                            <button onclick="downloadCurrentCode()" 
+                                    class="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition">
+                                <i class="fas fa-download mr-1"></i>下载代码
+                            </button>
                         </div>
-                        <div id="generatedCode" class="code-block">
-                            <!-- 生成的代码将显示在这里 -->
+
+                        <div id="codeContentApi" class="tab-content active">
+                            <div id="generatedCodeApi" class="code-block"></div>
+                        </div>
+                        <div id="codeContentPlaywright" class="tab-content">
+                            <div id="generatedCodePlaywright" class="code-block"></div>
                         </div>
                     </div>
                 </div>
@@ -154,17 +199,30 @@
     <script>
         const formData = {{ form.to_dict() | tojson }};
         const fields = formData.schema.fields || [];
-        let currentScreenshots = {};
+        let currentCodeApi = '';
+        let currentCodePlaywright = '';
+        let currentTab = 'api';
 
         // 初始化测试数据表单
         function initTestDataForm() {
             const container = document.getElementById('testDataForm');
             container.innerHTML = '';
 
+            if (fields.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8 text-gray-400">
+                        <i class="fas fa-inbox text-4xl mb-3"></i>
+                        <p>该表单暂无字段</p>
+                    </div>
+                `;
+                return;
+            }
+
             fields.forEach(field => {
                 const fieldName = field.name;
                 const fieldType = field.type;
                 const fieldLabel = field.label || fieldName;
+                const isRequired = field.required || false;
 
                 let inputHtml = '';
 
@@ -244,6 +302,7 @@
                     <div class="form-group">
                         <label class="block text-sm font-medium text-gray-700 mb-1">
                             ${fieldLabel}
+                            ${isRequired ? '<span class="text-red-500">*</span>' : ''}
                             <span class="text-gray-400 text-xs">(${fieldType})</span>
                         </label>
                         ${inputHtml}
@@ -270,7 +329,7 @@
                     // 跳过文件上传
                 } else {
                     const input = document.getElementById(`test_${fieldName}`);
-                    if (input && input.value) {
+                    if (input && input.value !== undefined && input.value !== '') {
                         testData[fieldName] = input.value;
                     }
                 }
@@ -279,19 +338,32 @@
             return testData;
         }
 
-        // 运行 Playwright 测试
-        async function runPlaywrightTest() {
+        // 运行 API 测试
+        async function runApiTest() {
             const testData = collectTestData();
             const stepsContainer = document.getElementById('testSteps');
+            const validationResult = document.getElementById('validationResult');
+            const validationContent = document.getElementById('validationContent');
             
             stepsContainer.innerHTML = `
                 <div class="step-status-running">
-                    <i class="fas fa-spinner fa-spin mr-2"></i>准备执行 Playwright 测试...
+                    <i class="fas fa-spinner fa-spin mr-2"></i>准备执行 API 测试...
                 </div>
             `;
 
+            validationResult.classList.add('hidden');
+
             try {
-                const response = await fetch('/api/test/playwright', {
+                stepsContainer.innerHTML = `
+                    <div class="step-status-running">
+                        <i class="fas fa-spinner fa-spin mr-2"></i>正在发送请求到后端 API...
+                    </div>
+                    <div class="step-status-running mt-2">
+                        <i class="fas fa-info-circle mr-2"></i>测试数据: ${JSON.stringify(testData)}
+                    </div>
+                `;
+
+                const response = await fetch('/api/test/api', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -303,7 +375,7 @@
                 });
 
                 const result = await response.json();
-                displayTestResult(result);
+                displayApiTestResult(result);
 
             } catch (error) {
                 stepsContainer.innerHTML = `
@@ -314,9 +386,12 @@
             }
         }
 
-        // 显示测试结果
-        function displayTestResult(result) {
+        // 显示 API 测试结果
+        function displayApiTestResult(result) {
             const stepsContainer = document.getElementById('testSteps');
+            const validationResult = document.getElementById('validationResult');
+            const validationContent = document.getElementById('validationContent');
+
             let stepsHtml = '';
 
             result.steps.forEach(step => {
@@ -343,105 +418,163 @@
 
             stepsContainer.innerHTML = stepsHtml;
 
-            // 显示截图
-            if (result.screenshots && result.screenshots.length > 0) {
-                currentScreenshots = {};
-                result.screenshots.forEach(s => {
-                    currentScreenshots[s.name] = s.data;
-                });
-                displayScreenshots(result.screenshots);
-            }
-        }
-
-        // 显示截图
-        function displayScreenshots(screenshots) {
-            const tabsContainer = document.getElementById('screenshotTabs');
-            const contentContainer = document.getElementById('screenshotContent');
-            const tabsInner = tabsContainer.querySelector('div');
-
-            tabsContainer.classList.remove('hidden');
-            tabsInner.innerHTML = '';
-
-            screenshots.forEach((screenshot, index) => {
-                const tabName = {
-                    'initial_load': '页面加载',
-                    'after_fill': '填写完成',
-                    'after_submit': '提交后',
-                    'error': '错误截图'
-                }[screenshot.name] || screenshot.name;
-
-                tabsInner.innerHTML += `
-                    <button onclick="showScreenshot('${screenshot.name}')" 
-                            class="px-3 py-1 text-sm ${index === 0 ? 'bg-purple-100 text-purple-700' : 'text-gray-600 hover:text-gray-800'} rounded transition"
-                            data-screenshot="${screenshot.name}">
-                        ${tabName}
-                    </button>
-                `;
-            });
-
-            // 显示第一个截图
-            if (screenshots.length > 0) {
-                showScreenshot(screenshots[0].name);
-            }
-        }
-
-        // 显示指定截图
-        function showScreenshot(name) {
-            const contentContainer = document.getElementById('screenshotContent');
-            const tabs = document.querySelectorAll('#screenshotTabs button');
-
-            // 更新标签样式
-            tabs.forEach(tab => {
-                if (tab.dataset.screenshot === name) {
-                    tab.classList.remove('text-gray-600', 'hover:text-gray-800');
-                    tab.classList.add('bg-purple-100', 'text-purple-700');
+            // 显示验证结果详情
+            if (result.validation_result) {
+                validationResult.classList.remove('hidden');
+                
+                if (result.validation_result.valid) {
+                    validationContent.innerHTML = `
+                        <div class="p-4 bg-green-50 rounded-lg border border-green-200">
+                            <div class="flex items-center text-green-800">
+                                <i class="fas fa-check-circle text-xl mr-3"></i>
+                                <div>
+                                    <h3 class="font-bold">数据验证通过</h3>
+                                    <p class="text-sm">所有字段都符合验证规则</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
                 } else {
-                    tab.classList.remove('bg-purple-100', 'text-purple-700');
-                    tab.classList.add('text-gray-600', 'hover:text-gray-800');
-                }
-            });
+                    let errorHtml = `
+                        <div class="p-4 bg-red-50 rounded-lg border border-red-200">
+                            <div class="flex items-center text-red-800 mb-3">
+                                <i class="fas fa-times-circle text-xl mr-3"></i>
+                                <div>
+                                    <h3 class="font-bold">数据验证失败</h3>
+                                    <p class="text-sm">以下字段存在问题</p>
+                                </div>
+                            </div>
+                            <div class="space-y-2">
+                    `;
 
-            // 显示截图
-            if (currentScreenshots[name]) {
-                contentContainer.innerHTML = `
-                    <img src="data:image/png;base64,${currentScreenshots[name]}" 
-                         alt="Screenshot: ${name}"
-                         class="max-w-full rounded shadow">
+                    for (const [field, error] of Object.entries(result.validation_result.errors)) {
+                        errorHtml += `
+                            <div class="flex items-start text-red-700 text-sm">
+                                <i class="fas fa-exclamation-circle mt-0.5 mr-2 flex-shrink-0"></i>
+                                <span><strong>${field}:</strong> ${error}</span>
+                            </div>
+                        `;
+                    }
+
+                    errorHtml += `
+                            </div>
+                        </div>
+                    `;
+                    validationContent.innerHTML = errorHtml;
+                }
+            }
+
+            // 显示提交ID
+            if (result.submission_id) {
+                validationContent.innerHTML += `
+                    <div class="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <div class="flex items-center text-blue-800">
+                            <i class="fas fa-database text-xl mr-3"></i>
+                            <div>
+                                <h3 class="font-bold">数据已保存</h3>
+                                <p class="text-sm">提交ID: ${result.submission_id}</p>
+                            </div>
+                        </div>
+                    </div>
                 `;
             }
         }
 
         // 生成测试代码
         async function generateTestCode() {
+            const codeSection = document.getElementById('codeSection');
+            const stepsContainer = document.getElementById('testSteps');
+            
+            stepsContainer.innerHTML = `
+                <div class="step-status-running">
+                    <i class="fas fa-spinner fa-spin mr-2"></i>正在生成测试代码...
+                </div>
+            `;
+
             try {
                 const response = await fetch(`/api/test/generate-code/${formData.id}`);
                 const result = await response.json();
 
-                const codeSection = document.getElementById('codeSection');
-                const codeContainer = document.getElementById('generatedCode');
+                currentCodeApi = result.api_test_code;
+                currentCodePlaywright = result.playwright_test_code;
+
+                document.getElementById('generatedCodeApi').textContent = currentCodeApi;
+                document.getElementById('generatedCodePlaywright').textContent = currentCodePlaywright;
 
                 codeSection.classList.remove('hidden');
-                codeContainer.textContent = result.code;
-                
-                // 滚动到代码区域
                 codeSection.scrollIntoView({ behavior: 'smooth' });
 
+                stepsContainer.innerHTML = `
+                    <div class="step-status-success">
+                        <i class="fas fa-check-circle mr-2"></i>测试代码生成成功！
+                    </div>
+                    <div class="step-status-success mt-2">
+                        <i class="fas fa-info-circle mr-2"></i>生成时间: ${result.generated_at}
+                    </div>
+                `;
+
             } catch (error) {
-                alert('生成代码失败: ' + error.message);
+                stepsContainer.innerHTML = `
+                    <div class="step-status-error">
+                        <i class="fas fa-times-circle mr-2"></i>生成代码失败: ${error.message}
+                    </div>
+                `;
             }
         }
 
-        // 复制测试代码
-        function copyTestCode() {
-            const codeContainer = document.getElementById('generatedCode');
-            const code = codeContainer.textContent;
+        // 显示代码标签页
+        function showCodeTab(tab) {
+            currentTab = tab;
 
+            const tabApi = document.getElementById('tabApi');
+            const tabPlaywright = document.getElementById('tabPlaywright');
+            const contentApi = document.getElementById('codeContentApi');
+            const contentPlaywright = document.getElementById('codeContentPlaywright');
+
+            if (tab === 'api') {
+                tabApi.classList.add('active');
+                tabPlaywright.classList.remove('active');
+                tabPlaywright.classList.add('bg-gray-100', 'text-gray-700');
+                contentApi.classList.add('active');
+                contentPlaywright.classList.remove('active');
+            } else {
+                tabPlaywright.classList.add('active');
+                tabApi.classList.remove('active');
+                tabApi.classList.add('bg-gray-100', 'text-gray-700');
+                contentPlaywright.classList.add('active');
+                contentApi.classList.remove('active');
+            }
+        }
+
+        // 复制当前代码
+        function copyCurrentCode() {
+            const code = currentTab === 'api' ? currentCodeApi : currentCodePlaywright;
+            
             navigator.clipboard.writeText(code).then(() => {
                 alert('代码已复制到剪贴板！');
             }).catch(err => {
                 console.error('复制失败:', err);
                 alert('复制失败，请手动复制');
             });
+        }
+
+        // 下载当前代码
+        function downloadCurrentCode() {
+            const code = currentTab === 'api' ? currentCodeApi : currentCodePlaywright;
+            const suffix = currentTab === 'api' ? 'api_test' : 'playwright_test';
+            const filename = `test_form_${formData.id}_${suffix}.py`;
+
+            const blob = new Blob([code], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            alert(`代码已下载: ${filename}`);
         }
 
         // 初始化

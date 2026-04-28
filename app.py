@@ -3,9 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import json
 import os
-import base64
-import io
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+import re
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///lowcode.db'
@@ -152,11 +150,10 @@ def test_form(form_id):
     form = Form.query.get_or_404(form_id)
     return render_template('test_form.html', form=form)
 
-@app.route('/api/test/playwright', methods=['POST'])
-def run_playwright_test():
+@app.route('/api/test/api', methods=['POST'])
+def run_api_test():
     data = request.get_json()
     form_id = data.get('form_id')
-    test_script = data.get('script')
     test_data = data.get('test_data', {})
     
     if not form_id:
@@ -166,179 +163,85 @@ def run_playwright_test():
     if not form:
         return jsonify({'error': 'Form not found'}), 404
     
+    results = {
+        'steps': [],
+        'success': True,
+        'message': '',
+        'validation_result': None,
+        'submission_id': None
+    }
+    
     try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            context = browser.new_context(
-                viewport={'width': 1280, 'height': 800}
+        fields = json.loads(form.schema).get('fields', [])
+        
+        results['steps'].append({
+            'action': 'validate',
+            'status': 'running',
+            'message': '正在验证表单数据...'
+        })
+        
+        validation_result = validate_form_data(form, test_data)
+        results['validation_result'] = validation_result
+        
+        if validation_result['valid']:
+            results['steps'].append({
+                'action': 'validate',
+                'status': 'success',
+                'message': '数据验证通过'
+            })
+            
+            results['steps'].append({
+                'action': 'submit',
+                'status': 'running',
+                'message': '正在提交表单...'
+            })
+            
+            submission = FormSubmission(
+                form_id=form_id,
+                data=json.dumps(test_data)
             )
-            page = context.new_page()
+            db.session.add(submission)
+            db.session.commit()
             
-            test_url = request.host_url + f'form/{form_id}'
+            results['submission_id'] = submission.id
+            results['steps'].append({
+                'action': 'submit',
+                'status': 'success',
+                'message': f'表单提交成功，提交ID: {submission.id}'
+            })
             
-            results = {
-                'steps': [],
-                'screenshots': [],
-                'success': True,
-                'message': ''
-            }
+            results['message'] = 'API测试执行完成'
+            results['success'] = True
+        else:
+            results['steps'].append({
+                'action': 'validate',
+                'status': 'error',
+                'message': '数据验证失败'
+            })
             
-            try:
-                results['steps'].append({'action': 'navigate', 'status': 'running', 'message': f'正在访问: {test_url}'})
-                page.goto(test_url, wait_until='networkidle', timeout=30000)
-                
-                screenshot = page.screenshot(full_page=True)
-                results['screenshots'].append({
-                    'name': 'initial_load',
-                    'data': base64.b64encode(screenshot).decode('utf-8')
-                })
-                results['steps'].append({'action': 'navigate', 'status': 'success', 'message': '页面加载成功'})
-                
-                fields = json.loads(form.schema).get('fields', [])
-                
-                for field in fields:
-                    field_name = field.get('name')
-                    field_type = field.get('type')
-                    
-                    if field_name in test_data:
-                        value = test_data[field_name]
-                        selector = f'[name="{field_name}"]'
-                        
-                        try:
-                            page.wait_for_selector(selector, timeout=5000)
-                            
-                            if field_type in ['text', 'email', 'number', 'textarea']:
-                                page.fill(selector, str(value))
-                                results['steps'].append({
-                                    'action': 'fill',
-                                    'field': field_name,
-                                    'value': value,
-                                    'status': 'success',
-                                    'message': f'填写字段 {field_name}: {value}'
-                                })
-                            
-                            elif field_type == 'select':
-                                page.select_option(selector, value)
-                                results['steps'].append({
-                                    'action': 'select',
-                                    'field': field_name,
-                                    'value': value,
-                                    'status': 'success',
-                                    'message': f'选择字段 {field_name}: {value}'
-                                })
-                            
-                            elif field_type == 'radio':
-                                radio_selector = f'input[name="{field_name}"][value="{value}"]'
-                                page.check(radio_selector)
-                                results['steps'].append({
-                                    'action': 'check',
-                                    'field': field_name,
-                                    'value': value,
-                                    'status': 'success',
-                                    'message': f'选中单选框 {field_name}: {value}'
-                                })
-                            
-                            elif field_type == 'checkbox':
-                                if isinstance(value, list):
-                                    for v in value:
-                                        checkbox_selector = f'input[name="{field_name}"][value="{v}"]'
-                                        page.check(checkbox_selector)
-                                    results['steps'].append({
-                                        'action': 'check',
-                                        'field': field_name,
-                                        'value': value,
-                                        'status': 'success',
-                                        'message': f'选中多选框 {field_name}: {", ".join(value)}'
-                                    })
-                            
-                            elif field_type == 'date':
-                                page.fill(selector, value)
-                                results['steps'].append({
-                                    'action': 'fill',
-                                    'field': field_name,
-                                    'value': value,
-                                    'status': 'success',
-                                    'message': f'填写日期 {field_name}: {value}'
-                                })
-                                
-                        except PlaywrightTimeoutError:
-                            results['steps'].append({
-                                'action': 'fill',
-                                'field': field_name,
-                                'status': 'warning',
-                                'message': f'字段 {field_name} 未找到，跳过'
-                            })
-                
-                fill_screenshot = page.screenshot(full_page=True)
-                results['screenshots'].append({
-                    'name': 'after_fill',
-                    'data': base64.b64encode(fill_screenshot).decode('utf-8')
-                })
-                results['steps'].append({'action': 'fill', 'status': 'success', 'message': '所有字段填写完成'})
-                
-                results['steps'].append({'action': 'submit', 'status': 'running', 'message': '正在提交表单...'})
-                
-                submit_button = page.locator('button[type="submit"]')
-                if submit_button.count() > 0:
-                    submit_button.click()
-                    
-                    try:
-                        page.wait_for_event('response', timeout=10000)
-                    except:
-                        pass
-                    
-                    page.wait_for_timeout(2000)
-                    
-                    submit_screenshot = page.screenshot(full_page=True)
-                    results['screenshots'].append({
-                        'name': 'after_submit',
-                        'data': base64.b64encode(submit_screenshot).decode('utf-8')
-                    })
-                    
-                    results['steps'].append({'action': 'submit', 'status': 'success', 'message': '表单提交成功'})
-                else:
-                    results['steps'].append({'action': 'submit', 'status': 'warning', 'message': '未找到提交按钮'})
-                
-                results['message'] = '测试执行完成'
-                results['success'] = True
-                
-            except PlaywrightTimeoutError as e:
-                results['success'] = False
-                results['message'] = f'页面加载超时: {str(e)}'
-                results['steps'].append({'action': 'error', 'status': 'error', 'message': str(e)})
-                
-                error_screenshot = page.screenshot(full_page=True)
-                results['screenshots'].append({
-                    'name': 'error',
-                    'data': base64.b64encode(error_screenshot).decode('utf-8')
+            error_details = []
+            for field_name, error_msg in validation_result['errors'].items():
+                error_details.append(f'{field_name}: {error_msg}')
+                results['steps'].append({
+                    'action': 'validate_error',
+                    'field': field_name,
+                    'status': 'error',
+                    'message': f'{field_name}: {error_msg}'
                 })
             
-            except Exception as e:
-                results['success'] = False
-                results['message'] = f'测试执行出错: {str(e)}'
-                results['steps'].append({'action': 'error', 'status': 'error', 'message': str(e)})
-                
-                try:
-                    error_screenshot = page.screenshot(full_page=True)
-                    results['screenshots'].append({
-                        'name': 'error',
-                        'data': base64.b64encode(error_screenshot).decode('utf-8')
-                    })
-                except:
-                    pass
-            
-            finally:
-                browser.close()
-            
-            return jsonify(results)
+            results['message'] = '数据验证失败: ' + '; '.join(error_details)
+            results['success'] = False
             
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'message': f'Playwright 启动失败: {str(e)}',
-            'steps': [{'action': 'error', 'status': 'error', 'message': str(e)}],
-            'screenshots': []
-        }), 500
+        results['success'] = False
+        results['message'] = f'测试执行出错: {str(e)}'
+        results['steps'].append({
+            'action': 'error',
+            'status': 'error',
+            'message': str(e)
+        })
+    
+    return jsonify(results)
 
 @app.route('/api/test/generate-code/<int:form_id>')
 def generate_test_code(form_id):
@@ -346,102 +249,362 @@ def generate_test_code(form_id):
     schema = json.loads(form.schema)
     fields = schema.get('fields', [])
     
-    test_code = f'''# 自动生成的 Playwright 测试代码
-# 表单: {form.name}
-# 生成时间: {datetime.now().isoformat()}
-
-from playwright.sync_api import sync_playwright
-
-def test_form():
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
-        context = browser.new_context(
-            viewport={{'width': 1280, 'height': 800}}
-        )
-        page = context.new_page()
-        
-        # 访问表单页面
-        form_url = "http://localhost:2222/form/{form_id}"
-        page.goto(form_url, wait_until='networkidle')
-        
-        # 填写表单字段
-'''
-    
+    fields_info = []
     for field in fields:
-        field_name = field.get('name')
-        field_type = field.get('type')
-        field_label = field.get('label', field_name)
-        
-        if field_type in ['text', 'email']:
-            test_code += f'''
-        # {field_label} ({field_type})
-        page.fill('[name="{field_name}"]', "test_value")
-'''
-        elif field_type == 'number':
-            test_code += f'''
-        # {field_label} ({field_type})
-        page.fill('[name="{field_name}"]', "123")
-'''
-        elif field_type == 'textarea':
-            test_code += f'''
-        # {field_label} ({field_type})
-        page.fill('[name="{field_name}"]', "这是测试文本内容")
-'''
-        elif field_type == 'select':
-            options = field.get('options', [])
-            if options:
-                test_code += f'''
-        # {field_label} ({field_type})
-        # 选项: {', '.join([o.get('label') for o in options])}
-        page.select_option('[name="{field_name}"]', "{options[0].get('value')}")
-'''
-        elif field_type == 'radio':
-            options = field.get('options', [])
-            if options:
-                test_code += f'''
-        # {field_label} ({field_type})
-        # 选项: {', '.join([o.get('label') for o in options])}
-        page.check('input[name="{field_name}"][value="{options[0].get('value')}"]')
-'''
-        elif field_type == 'checkbox':
-            options = field.get('options', [])
-            if options:
-                test_code += f'''
-        # {field_label} ({field_type})
-        # 选项: {', '.join([o.get('label') for o in options])}
-'''
-                for opt in options:
-                    test_code += f'''        page.check('input[name="{field_name}"][value="{opt.get('value')}"]')
-'''
-        elif field_type == 'date':
-            test_code += f'''
-        # {field_label} ({field_type})
-        page.fill('[name="{field_name}"]', "2024-01-01")
-'''
+        field_info = {
+            'name': field.get('name'),
+            'type': field.get('type'),
+            'label': field.get('label', field.get('name')),
+            'required': field.get('required', False),
+            'options': field.get('options', [])
+        }
+        fields_info.append(field_info)
     
-    test_code += f'''
-        # 截图
-        page.screenshot(path="before_submit.png", full_page=True)
-        
-        # 提交表单
-        submit_button = page.locator('button[type="submit"]')
-        if submit_button.count() > 0:
-            submit_button.click()
-            page.wait_for_timeout(2000)
-            page.screenshot(path="after_submit.png", full_page=True)
-        
-        browser.close()
-
-if __name__ == "__main__":
-    test_form()
-'''
+    api_test_code = generate_api_test_code(form, fields_info)
+    playwright_test_code = generate_playwright_test_code(form, fields_info)
     
     return jsonify({
         'form_name': form.name,
         'form_id': form_id,
         'generated_at': datetime.now().isoformat(),
-        'code': test_code
+        'api_test_code': api_test_code,
+        'playwright_test_code': playwright_test_code
     })
+
+def generate_api_test_code(form, fields_info):
+    test_data = {}
+    for field in fields_info:
+        field_name = field['name']
+        field_type = field['type']
+        
+        if field_type in ['text', 'email']:
+            test_data[field_name] = 'test_value' if field_type == 'text' else 'test@example.com'
+        elif field_type == 'number':
+            test_data[field_name] = 123
+        elif field_type == 'textarea':
+            test_data[field_name] = '这是测试文本内容'
+        elif field_type in ['select', 'radio']:
+            if field['options']:
+                test_data[field_name] = field['options'][0]['value']
+        elif field_type == 'checkbox':
+            if field['options']:
+                test_data[field_name] = [opt['value'] for opt in field['options'][:2]]
+        elif field_type == 'date':
+            test_data[field_name] = '2024-01-01'
+    
+    fields_doc = '\n'.join([f"#   - {f['label']} ({f['name']}): {f['type']}" for f in fields_info])
+    
+    return f'''# API 测试代码 - 不需要浏览器
+# 表单: {form.name}
+# 生成时间: {datetime.now().isoformat()}
+# 
+# 字段说明:
+{fields_doc}
+
+import requests
+import json
+
+def test_form_api():
+    """
+    API 测试 - 直接调用后端验证和提交接口
+    优点: 快速、稳定、不需要浏览器
+    用途: 验证后端逻辑、数据校验规则
+    """
+    
+    base_url = "http://localhost:2222"
+    form_id = {form.id}
+    
+    test_data = {json.dumps(test_data, ensure_ascii=False, indent=8)}
+    
+    print("=" * 60)
+    print("API 测试开始")
+    print("=" * 60)
+    
+    print(f"\\n1. 准备测试数据:")
+    for key, value in test_data.items():
+        print(f"   - {key}: {value}")
+    
+    print(f"\\n2. 提交表单到 API...")
+    try:
+        response = requests.post(
+            f"{{base_url}}/api/forms/{{form_id}}/submit",
+            headers={{"Content-Type": "application/json"}},
+            json=test_data,
+            timeout=10
+        )
+        
+        result = response.json()
+        
+        if response.status_code == 200 and result.get('valid'):
+            print(f"   ✅ 提交成功!")
+            print(f"   📋 提交ID: {{result.get('submission_id')}}")
+            print(f"   📝 消息: {{result.get('message')}}")
+            return True
+        else:
+            print(f"   ❌ 提交失败!")
+            print(f"   📋 状态码: {{response.status_code}}")
+            
+            if result.get('errors'):
+                print(f"\\n   验证错误:")
+                for field, error in result['errors'].items():
+                    print(f"      - {{field}}: {{error}}")
+            
+            return False
+            
+    except requests.exceptions.RequestException as e:
+        print(f"   ❌ 请求错误: {{str(e)}}")
+        return False
+
+def test_validation():
+    """
+    测试数据验证规则
+    """
+    print("\\n" + "=" * 60)
+    print("数据验证测试")
+    print("=" * 60)
+    
+    base_url = "http://localhost:2222"
+    form_id = {form.id}
+    
+    invalid_test_cases = [
+        {{
+            "name": "空数据测试",
+            "data": {{}},
+            "expected": "应该失败 - 必填字段未填写"
+        }},
+        {{
+            "name": "无效邮箱测试",
+            "data": {{"email": "not-an-email"}},
+            "expected": "应该失败 - 邮箱格式错误"
+        }}
+    ]
+    
+    for case in invalid_test_cases:
+        print(f"\\n测试: {{case['name']}}")
+        print(f"期望: {{case['expected']}}")
+        
+        try:
+            response = requests.post(
+                f"{{base_url}}/api/forms/{{form_id}}/submit",
+                headers={{"Content-Type": "application/json"}},
+                json=case['data'],
+                timeout=10
+            )
+            
+            result = response.json()
+            
+            if not result.get('valid'):
+                print(f"   ✅ 符合预期 - 验证失败")
+                if result.get('errors'):
+                    print(f"   错误信息:")
+                    for field, error in result['errors'].items():
+                        print(f"      - {{field}}: {{error}}")
+            else:
+                print(f"   ⚠️  意外通过 - 可能没有必填字段或验证规则")
+                
+        except requests.exceptions.RequestException as e:
+            print(f"   ❌ 请求错误: {{str(e)}}")
+
+if __name__ == "__main__":
+    success = test_form_api()
+    test_validation()
+    
+    print("\\n" + "=" * 60)
+    if success:
+        print("✅ 所有测试通过!")
+    else:
+        print("⚠️  部分测试失败，请检查输出")
+    print("=" * 60)
+'''
+
+def generate_playwright_test_code(form, fields_info):
+    fields_doc = '\n'.join([f"#   - {f['label']} ({f['name']}): {f['type']}" for f in fields_info])
+    
+    fill_code = ""
+    for field in fields_info:
+        field_name = field['name']
+        field_type = field['type']
+        field_label = field['label']
+        
+        if field_type in ['text', 'email']:
+            test_value = 'test_value' if field_type == 'text' else 'test@example.com'
+            fill_code += f'''
+        # {field_label}
+        page.fill('[name="{field_name}"]', "{test_value}")
+        print(f"   ✅ 已填写: {field_label}")
+'''
+        elif field_type == 'number':
+            fill_code += f'''
+        # {field_label}
+        page.fill('[name="{field_name}"]', "123")
+        print(f"   ✅ 已填写: {field_label}")
+'''
+        elif field_type == 'textarea':
+            fill_code += f'''
+        # {field_label}
+        page.fill('[name="{field_name}"]', "这是测试文本内容")
+        print(f"   ✅ 已填写: {field_label}")
+'''
+        elif field_type == 'select':
+            if field['options']:
+                first_option = field['options'][0]
+                fill_code += f'''
+        # {field_label}
+        page.select_option('[name="{field_name}"]', "{first_option['value']}")
+        print(f"   ✅ 已选择: {field_label} = {first_option['label']}")
+'''
+        elif field_type == 'radio':
+            if field['options']:
+                first_option = field['options'][0]
+                fill_code += f'''
+        # {field_label}
+        page.check('input[name="{field_name}"][value="{first_option['value']}"]')
+        print(f"   ✅ 已选择: {field_label} = {first_option['label']}")
+'''
+        elif field_type == 'checkbox':
+            if field['options']:
+                first_option = field['options'][0]
+                fill_code += f'''
+        # {field_label}
+        page.check('input[name="{field_name}"][value="{first_option['value']}"]')
+        print(f"   ✅ 已选择: {field_label} = {first_option['label']}")
+'''
+        elif field_type == 'date':
+            fill_code += f'''
+        # {field_label}
+        page.fill('[name="{field_name}"]', "2024-01-01")
+        print(f"   ✅ 已填写: {field_label}")
+'''
+    
+    return f'''# Playwright 端到端测试代码
+# 表单: {form.name}
+# 生成时间: {datetime.now().isoformat()}
+# 
+# 字段说明:
+{fields_doc}
+#
+# 使用说明:
+# 1. 确保服务器已启动: python app.py
+# 2. 安装依赖: pip install playwright
+# 3. 安装浏览器: playwright install chromium
+# 4. 运行测试: python this_file.py
+
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+import os
+
+def test_form_e2e(headless=True):
+    """
+    端到端测试 - 使用 Playwright 模拟真实用户操作
+    优点: 测试完整的用户流程、验证前端交互
+    用途: 验证表单渲染、用户交互、提交流程
+    """
+    
+    print("=" * 60)
+    print("Playwright 端到端测试开始")
+    print("=" * 60)
+    
+    with sync_playwright() as p:
+        print("\\n1. 启动浏览器...")
+        browser = p.chromium.launch(headless=headless)
+        context = browser.new_context(
+            viewport={{"width": 1280, "height": 800}},
+            locale="zh-CN"
+        )
+        page = context.new_page()
+        
+        form_url = f"http://localhost:2222/form/{form.id}"
+        
+        try:
+            print(f"\\n2. 访问表单页面: {{form_url}}")
+            page.goto(form_url, wait_until="networkidle", timeout=30000)
+            
+            page.screenshot(path="screenshot_01_page_loaded.png", full_page=True)
+            print("   ✅ 页面加载成功")
+            print("   📸 截图已保存: screenshot_01_page_loaded.png")
+            
+            print(f"\\n3. 填写表单字段...")
+{fill_code}
+            
+            page.screenshot(path="screenshot_02_fields_filled.png", full_page=True)
+            print("\\n   📸 截图已保存: screenshot_02_fields_filled.png")
+            
+            print(f"\\n4. 提交表单...")
+            submit_button = page.locator('button[type="submit"]')
+            
+            if submit_button.count() > 0:
+                submit_button.click()
+                
+                print("   ⏳ 等待提交响应...")
+                page.wait_for_timeout(3000)
+                
+                page.screenshot(path="screenshot_03_after_submit.png", full_page=True)
+                print("   ✅ 提交完成")
+                print("   📸 截图已保存: screenshot_03_after_submit.png")
+            else:
+                print("   ⚠️  未找到提交按钮")
+            
+            print("\\n" + "=" * 60)
+            print("✅ 测试完成!")
+            print("=" * 60)
+            print("\\n生成的截图文件:")
+            for f in os.listdir('.'):
+                if f.startswith('screenshot_') and f.endswith('.png'):
+                    print(f"   - {{f}}")
+            
+            return True
+            
+        except PlaywrightTimeoutError as e:
+            print(f"\\n❌ 超时错误: {{str(e)}}")
+            page.screenshot(path="screenshot_error.png", full_page=True)
+            print("   📸 错误截图已保存: screenshot_error.png")
+            return False
+            
+        except Exception as e:
+            print(f"\\n❌ 测试失败: {{str(e)}}")
+            try:
+                page.screenshot(path="screenshot_error.png", full_page=True)
+                print("   📸 错误截图已保存: screenshot_error.png")
+            except:
+                pass
+            return False
+            
+        finally:
+            browser.close()
+
+def test_linkage_rules():
+    """
+    测试表单联动规则
+    """
+    print("\\n" + "=" * 60)
+    print("联动规则测试 (需要手动实现)")
+    print("=" * 60)
+    print("\\n提示: 如果表单包含联动规则，可以在此添加测试:")
+    print("""
+    # 示例: 测试字段显示/隐藏联动
+    # 1. 填写触发字段
+    # page.fill('[name="trigger_field"]', "某些值")
+    # 2. 等待联动生效
+    # page.wait_for_timeout(500)
+    # 3. 验证目标字段状态
+    # target_field = page.locator('[data-field-name="target_field"]')
+    # assert target_field.is_visible() == expected_visibility
+""")
+
+if __name__ == "__main__":
+    import sys
+    
+    headless = len(sys.argv) > 1 and sys.argv[1] == '--headless'
+    
+    print("\\n提示:")
+    print("  - 运行可视化测试: python this_file.py")
+    print("  - 运行无头测试:   python this_file.py --headless")
+    print()
+    
+    success = test_form_e2e(headless=headless)
+    test_linkage_rules()
+    
+    sys.exit(0 if success else 1)
+'''
 
 def validate_form_data(form, data):
     validation_rules = json.loads(form.validation_rules) if form.validation_rules else {}

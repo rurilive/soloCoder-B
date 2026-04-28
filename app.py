@@ -272,47 +272,51 @@ def generate_test_code(form_id):
     })
 
 def generate_api_test_code(form, fields_info):
-    def build_test_data_lines():
-        lines = []
-        lines.append("    test_data = {")
-        for field in fields_info:
-            field_name = field['name']
-            field_type = field['type']
-            
-            value = None
-            if field_type in ['text', 'email']:
-                value = 'test_value' if field_type == 'text' else 'test@example.com'
-            elif field_type == 'number':
-                value = 123
-            elif field_type == 'textarea':
-                value = '这是测试文本内容'
-            elif field_type in ['select', 'radio']:
-                if field['options']:
-                    value = field['options'][0]['value']
-            elif field_type == 'checkbox':
-                if field['options']:
-                    value = [opt['value'] for opt in field['options'][:2]]
-            elif field_type == 'date':
-                value = '2024-01-01'
-            
-            if value is not None:
-                if isinstance(value, str):
-                    lines.append(f"        '{field_name}': '{value}',")
-                elif isinstance(value, list):
-                    list_items = ', '.join([f"'{v}'" for v in value])
-                    lines.append(f"        '{field_name}': [{list_items}],")
-                else:
-                    lines.append(f"        '{field_name}': {value},")
-        
-        lines.append("    }")
-        return '\n'.join(lines)
+    form_id_str = str(form.id)
+    form_name_str = form.name
+    timestamp = datetime.now().isoformat()
     
     fields_doc = '\n'.join([f"#   - {f['label']} ({f['name']}): {f['type']}" for f in fields_info])
-    test_data_code = build_test_data_lines()
     
-    code = f'''# API 测试代码 - 不需要浏览器
-# 表单: {form.name}
-# 生成时间: {datetime.now().isoformat()}
+    test_data_dict = {}
+    for field in fields_info:
+        field_name = field['name']
+        field_type = field['type']
+        
+        if field_type in ['text', 'email']:
+            test_data_dict[field_name] = 'test_value' if field_type == 'text' else 'test@example.com'
+        elif field_type == 'number':
+            test_data_dict[field_name] = 123
+        elif field_type == 'textarea':
+            test_data_dict[field_name] = '这是测试文本内容'
+        elif field_type in ['select', 'radio']:
+            if field['options']:
+                test_data_dict[field_name] = field['options'][0]['value']
+        elif field_type == 'checkbox':
+            if field['options']:
+                test_data_dict[field_name] = [opt['value'] for opt in field['options'][:2]]
+        elif field_type == 'date':
+            test_data_dict[field_name] = '2024-01-01'
+    
+    def format_value(v):
+        if isinstance(v, str):
+            return f"'{v}'"
+        elif isinstance(v, list):
+            list_items = ', '.join([f"'{item}'" for item in v])
+            return f"[{list_items}]"
+        else:
+            return str(v)
+    
+    test_data_lines = []
+    test_data_lines.append("    test_data = {")
+    for k, v in test_data_dict.items():
+        test_data_lines.append(f"        '{k}': {format_value(v)},")
+    test_data_lines.append("    }")
+    test_data_code = '\n'.join(test_data_lines)
+    
+    code = f"""# API 测试代码 - 不需要浏览器
+# 表单: {form_name_str}
+# 生成时间: {timestamp}
 # 
 # 字段说明:
 {fields_doc}
@@ -320,14 +324,14 @@ def generate_api_test_code(form, fields_info):
 import requests
 
 def test_form_api():
-    """
+    \"\"\"
     API 测试 - 直接调用后端验证和提交接口
     优点: 快速、稳定、不需要浏览器
     用途: 验证后端逻辑、数据校验规则
-    """
+    \"\"\"
     
     base_url = "http://localhost:2222"
-    form_id = {form.id}
+    form_id = {form_id_str}
     
 {test_data_code}
     
@@ -371,15 +375,15 @@ def test_form_api():
         return False
 
 def test_validation():
-    """
+    \"\"\"
     测试数据验证规则
-    """
+    \"\"\"
     print("\\n" + "=" * 60)
     print("数据验证测试")
     print("=" * 60)
     
     base_url = "http://localhost:2222"
-    form_id = {form.id}
+    form_id = {form_id_str}
     
     invalid_test_cases = [
         {{
@@ -430,7 +434,8 @@ if __name__ == "__main__":
     else:
         print("⚠️  部分测试失败，请检查输出")
     print("=" * 60)
-'''
+"""
+    
     return code
 
 def generate_playwright_test_code(form, fields_info):

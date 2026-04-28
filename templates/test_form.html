@@ -338,30 +338,93 @@
             return testData;
         }
 
-        // 运行 API 测试
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function createStepElement(step, showSpinner = false) {
+            const iconClass = {
+                'running': 'fa-spinner fa-spin',
+                'success': 'fa-check-circle',
+                'warning': 'fa-exclamation-triangle',
+                'error': 'fa-times-circle'
+            }[step.status] || 'fa-circle';
+
+            const div = document.createElement('div');
+            div.className = `step-status-${step.status} py-1`;
+            div.style.opacity = '0';
+            div.style.transform = 'translateX(-20px)';
+            div.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+            div.innerHTML = `<i class="fas ${iconClass} mr-2"></i>${step.message}`;
+            return div;
+        }
+
+        function updateStepStatus(stepElement, newStatus) {
+            const iconClass = {
+                'running': 'fa-spinner fa-spin',
+                'success': 'fa-check-circle',
+                'warning': 'fa-exclamation-triangle',
+                'error': 'fa-times-circle'
+            }[newStatus] || 'fa-circle';
+
+            stepElement.className = `step-status-${newStatus} py-1`;
+            const icon = stepElement.querySelector('i');
+            if (icon) {
+                icon.className = `fas ${iconClass} mr-2`;
+            }
+        }
+
+        function showStep(container, stepElement) {
+            container.appendChild(stepElement);
+            requestAnimationFrame(() => {
+                stepElement.style.opacity = '1';
+                stepElement.style.transform = 'translateX(0)';
+            });
+        }
+
         async function runApiTest() {
             const testData = collectTestData();
             const stepsContainer = document.getElementById('testSteps');
             const validationResult = document.getElementById('validationResult');
             const validationContent = document.getElementById('validationContent');
             
-            stepsContainer.innerHTML = `
-                <div class="step-status-running">
-                    <i class="fas fa-spinner fa-spin mr-2"></i>准备执行 API 测试...
-                </div>
-            `;
-
+            stepsContainer.innerHTML = '';
             validationResult.classList.add('hidden');
 
             try {
-                stepsContainer.innerHTML = `
-                    <div class="step-status-running">
-                        <i class="fas fa-spinner fa-spin mr-2"></i>正在发送请求到后端 API...
-                    </div>
-                    <div class="step-status-running mt-2">
-                        <i class="fas fa-info-circle mr-2"></i>测试数据: ${JSON.stringify(testData)}
-                    </div>
-                `;
+                const step1 = createStepElement({
+                    status: 'running',
+                    message: '步骤 1/5: 准备执行 API 测试...'
+                });
+                showStep(stepsContainer, step1);
+                await delay(500);
+
+                updateStepStatus(step1, 'success');
+                await delay(300);
+
+                const step2 = createStepElement({
+                    status: 'running',
+                    message: `步骤 2/5: 收集测试数据...`
+                });
+                showStep(stepsContainer, step2);
+                await delay(500);
+
+                const testDataStr = JSON.stringify(testData, null, 2);
+                const step2a = createStepElement({
+                    status: 'warning',
+                    message: `   测试数据: ${JSON.stringify(testData)}`
+                });
+                showStep(stepsContainer, step2a);
+                await delay(400);
+
+                updateStepStatus(step2, 'success');
+                await delay(200);
+
+                const step3 = createStepElement({
+                    status: 'running',
+                    message: '步骤 3/5: 正在发送请求到后端 API...'
+                });
+                showStep(stepsContainer, step3);
 
                 const response = await fetch('/api/test/api', {
                     method: 'POST',
@@ -374,57 +437,68 @@
                     })
                 });
 
+                updateStepStatus(step3, 'success');
+                await delay(300);
+
+                const step4 = createStepElement({
+                    status: 'running',
+                    message: '步骤 4/5: 正在解析响应数据...'
+                });
+                showStep(stepsContainer, step4);
+                await delay(300);
+
                 const result = await response.json();
-                displayApiTestResult(result);
+                
+                updateStepStatus(step4, 'success');
+                await delay(200);
+
+                const step5 = createStepElement({
+                    status: 'running',
+                    message: '步骤 5/5: 正在显示测试结果...'
+                });
+                showStep(stepsContainer, step5);
+                await delay(400);
+
+                await displayApiTestResultAnimated(result, stepsContainer);
+
+                updateStepStatus(step5, 'success');
 
             } catch (error) {
-                stepsContainer.innerHTML = `
-                    <div class="step-status-error">
-                        <i class="fas fa-times-circle mr-2"></i>测试执行失败: ${error.message}
-                    </div>
-                `;
+                const errorStep = createStepElement({
+                    status: 'error',
+                    message: `测试执行失败: ${error.message}`
+                });
+                showStep(stepsContainer, errorStep);
             }
         }
 
-        // 显示 API 测试结果
-        function displayApiTestResult(result) {
-            const stepsContainer = document.getElementById('testSteps');
+        async function displayApiTestResultAnimated(result, stepsContainer) {
             const validationResult = document.getElementById('validationResult');
             const validationContent = document.getElementById('validationContent');
 
-            let stepsHtml = '';
+            for (let i = 0; i < result.steps.length; i++) {
+                const step = result.steps[i];
+                const stepElement = createStepElement(step);
+                showStep(stepsContainer, stepElement);
+                await delay(400);
+            }
 
-            result.steps.forEach(step => {
-                const iconClass = {
-                    'running': 'fa-spinner fa-spin',
-                    'success': 'fa-check-circle',
-                    'warning': 'fa-exclamation-triangle',
-                    'error': 'fa-times-circle'
-                }[step.status] || 'fa-circle';
+            await delay(300);
 
-                stepsHtml += `
-                    <div class="step-status-${step.status} py-1">
-                        <i class="fas ${iconClass} mr-2"></i>${step.message}
-                    </div>
-                `;
+            const finalStep = createStepElement({
+                status: result.success ? 'success' : 'error',
+                message: result.message
             });
+            finalStep.classList.add('mt-3', 'pt-3', 'border-t', 'border-gray-200');
+            showStep(stepsContainer, finalStep);
 
-            stepsHtml += `
-                <div class="mt-3 pt-3 border-t border-gray-200 ${result.success ? 'step-status-success' : 'step-status-error'}">
-                    <i class="fas ${result.success ? 'fa-check-circle' : 'fa-times-circle'} mr-2"></i>
-                    ${result.message}
-                </div>
-            `;
-
-            stepsContainer.innerHTML = stepsHtml;
-
-            // 显示验证结果详情
             if (result.validation_result) {
+                await delay(500);
                 validationResult.classList.remove('hidden');
                 
                 if (result.validation_result.valid) {
                     validationContent.innerHTML = `
-                        <div class="p-4 bg-green-50 rounded-lg border border-green-200">
+                        <div class="p-4 bg-green-50 rounded-lg border border-green-200" style="opacity: 0; transform: translateY(20px); transition: all 0.5s ease;">
                             <div class="flex items-center text-green-800">
                                 <i class="fas fa-check-circle text-xl mr-3"></i>
                                 <div>
@@ -434,9 +508,16 @@
                             </div>
                         </div>
                     `;
+                    setTimeout(() => {
+                        const el = validationContent.querySelector('div');
+                        if (el) {
+                            el.style.opacity = '1';
+                            el.style.transform = 'translateY(0)';
+                        }
+                    }, 50);
                 } else {
                     let errorHtml = `
-                        <div class="p-4 bg-red-50 rounded-lg border border-red-200">
+                        <div class="p-4 bg-red-50 rounded-lg border border-red-200" style="opacity: 0; transform: translateY(20px); transition: all 0.5s ease;">
                             <div class="flex items-center text-red-800 mb-3">
                                 <i class="fas fa-times-circle text-xl mr-3"></i>
                                 <div>
@@ -461,13 +542,25 @@
                         </div>
                     `;
                     validationContent.innerHTML = errorHtml;
+                    setTimeout(() => {
+                        const el = validationContent.querySelector('div');
+                        if (el) {
+                            el.style.opacity = '1';
+                            el.style.transform = 'translateY(0)';
+                        }
+                    }, 50);
                 }
             }
 
-            // 显示提交ID
             if (result.submission_id) {
-                validationContent.innerHTML += `
-                    <div class="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                await delay(600);
+                const submitDiv = document.createElement('div');
+                submitDiv.style.marginTop = '1rem';
+                submitDiv.style.opacity = '0';
+                submitDiv.style.transform = 'translateY(20px)';
+                submitDiv.style.transition = 'all 0.5s ease';
+                submitDiv.innerHTML = `
+                    <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
                         <div class="flex items-center text-blue-800">
                             <i class="fas fa-database text-xl mr-3"></i>
                             <div>
@@ -477,23 +570,64 @@
                         </div>
                     </div>
                 `;
+                validationContent.appendChild(submitDiv);
+                setTimeout(() => {
+                    submitDiv.style.opacity = '1';
+                    submitDiv.style.transform = 'translateY(0)';
+                }, 50);
             }
         }
 
-        // 生成测试代码
+        function displayApiTestResult(result) {
+            displayApiTestResultAnimated(result, document.getElementById('testSteps'));
+        }
+
         async function generateTestCode() {
             const codeSection = document.getElementById('codeSection');
             const stepsContainer = document.getElementById('testSteps');
             
-            stepsContainer.innerHTML = `
-                <div class="step-status-running">
-                    <i class="fas fa-spinner fa-spin mr-2"></i>正在生成测试代码...
-                </div>
-            `;
+            stepsContainer.innerHTML = '';
 
             try {
+                const step1 = createStepElement({
+                    status: 'running',
+                    message: '步骤 1/4: 准备生成测试代码...'
+                });
+                showStep(stepsContainer, step1);
+                await delay(400);
+
+                updateStepStatus(step1, 'success');
+                await delay(200);
+
+                const step2 = createStepElement({
+                    status: 'running',
+                    message: '步骤 2/4: 正在请求后端 API...'
+                });
+                showStep(stepsContainer, step2);
+
                 const response = await fetch(`/api/test/generate-code/${formData.id}`);
+                
+                updateStepStatus(step2, 'success');
+                await delay(200);
+
+                const step3 = createStepElement({
+                    status: 'running',
+                    message: '步骤 3/4: 正在解析响应数据...'
+                });
+                showStep(stepsContainer, step3);
+                await delay(300);
+
                 const result = await response.json();
+                
+                updateStepStatus(step3, 'success');
+                await delay(200);
+
+                const step4 = createStepElement({
+                    status: 'running',
+                    message: '步骤 4/4: 正在显示生成的代码...'
+                });
+                showStep(stepsContainer, step4);
+                await delay(300);
 
                 currentCodeApi = result.api_test_code;
                 currentCodePlaywright = result.playwright_test_code;
@@ -504,21 +638,23 @@
                 codeSection.classList.remove('hidden');
                 codeSection.scrollIntoView({ behavior: 'smooth' });
 
-                stepsContainer.innerHTML = `
-                    <div class="step-status-success">
-                        <i class="fas fa-check-circle mr-2"></i>测试代码生成成功！
-                    </div>
-                    <div class="step-status-success mt-2">
-                        <i class="fas fa-info-circle mr-2"></i>生成时间: ${result.generated_at}
-                    </div>
-                `;
+                updateStepStatus(step4, 'success');
+                await delay(200);
+
+                const successStep = createStepElement({
+                    status: 'success',
+                    message: `✅ 测试代码生成成功！生成时间: ${result.generated_at}`
+                });
+                successStep.classList.add('mt-3', 'pt-3', 'border-t', 'border-gray-200');
+                showStep(stepsContainer, successStep);
 
             } catch (error) {
-                stepsContainer.innerHTML = `
-                    <div class="step-status-error">
-                        <i class="fas fa-times-circle mr-2"></i>生成代码失败: ${error.message}
-                    </div>
-                `;
+                const errorStep = createStepElement({
+                    status: 'error',
+                    message: `❌ 生成代码失败: ${error.message}`
+                });
+                errorStep.classList.add('mt-3', 'pt-3', 'border-t', 'border-gray-200');
+                showStep(stepsContainer, errorStep);
             }
         }
 

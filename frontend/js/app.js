@@ -25,6 +25,14 @@ class App {
     }
 
     setupEventListeners() {
+        const nameInput = document.getElementById('workflow-name');
+        nameInput.addEventListener('input', (e) => {
+            if (this.currentWorkflow) {
+                this.currentWorkflow.name = e.target.value || '新建工作流';
+                this.markUnsaved();
+            }
+        });
+        
         document.getElementById('btn-new').addEventListener('click', () => {
             this.createNewWorkflow();
         });
@@ -103,6 +111,8 @@ class App {
             edges: []
         };
         
+        document.getElementById('workflow-name').value = this.currentWorkflow.name;
+        
         this.nodeManager.loadNodes([]);
         this.edgeManager.loadEdges([]);
         this.nodeManager.clearSelection();
@@ -124,6 +134,8 @@ class App {
             
             this.currentWorkflowId = workflowId;
             this.currentWorkflow = workflow;
+            
+            document.getElementById('workflow-name').value = workflow.name || '新建工作流';
             
             this.nodeManager.loadNodes(workflow.nodes || []);
             this.edgeManager.loadEdges(workflow.edges || []);

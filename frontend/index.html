@@ -11,7 +11,7 @@
         <header class="app-header">
             <div class="logo">
                 <span class="logo-icon">⚡</span>
-                <span class="logo-text">Low-Code Platform</span>
+                <input type="text" id="workflow-name" class="workflow-name-input" placeholder="工作流名称" value="新建工作流">
             </div>
             <div class="header-actions">
                 <select id="workflow-selector" class="workflow-selector">
@@ -128,13 +128,14 @@
                         <div class="property-group" id="group-condition" style="display: none;">
                             <label class="property-label">条件表达式</label>
                             <input type="text" id="prop-condition-expr" class="property-input" 
-                                   placeholder="例如: value > 10">
-                            <label class="property-label">真值输出</label>
+                                   placeholder="例如: value > 10 或 value == 'success' 或 len(value) > 0">
+                            <p class="property-hint">可用变量: <code>value</code> (来自上游节点的输入)</p>
+                            <label class="property-label">真值输出 (JSON格式)</label>
                             <input type="text" id="prop-true-value" class="property-input" 
-                                   placeholder="条件为真时的输出">
-                            <label class="property-label">假值输出</label>
+                                   placeholder='例如: {"status": "success"} 或 "OK" 或 1'>
+                            <label class="property-label">假值输出 (JSON格式)</label>
                             <input type="text" id="prop-false-value" class="property-input" 
-                                   placeholder="条件为假时的输出">
+                                   placeholder='例如: {"status": "failed"} 或 "NG" 或 0'>
                         </div>
                         <div class="property-group delete-group">
                             <button class="btn btn-danger" id="btn-delete-node">删除节点</button>

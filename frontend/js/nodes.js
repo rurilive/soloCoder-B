@@ -107,9 +107,9 @@ class NodeManager {
                     inputs: {},
                     outputs: {},
                     params: {
-                        expression: 'value is not None',
-                        true_value: null,
-                        false_value: null
+                        expression: 'value > 10',
+                        true_value: {'status': 'high', 'message': 'Value is greater than 10'},
+                        false_value: {'status': 'low', 'message': 'Value is 10 or less'}
                     }
                 };
             default:

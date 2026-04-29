@@ -85,6 +85,32 @@ body {
     color: var(--text-color);
 }
 
+.workflow-name-input {
+    padding: 6px 12px;
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: var(--text-color);
+    font-size: 16px;
+    font-weight: 600;
+    min-width: 150px;
+    transition: all 0.2s ease;
+}
+
+.workflow-name-input:hover {
+    background-color: var(--bg-tertiary);
+}
+
+.workflow-name-input:focus {
+    outline: none;
+    background-color: var(--bg-tertiary);
+    border-color: var(--primary-color);
+}
+
+.workflow-name-input::placeholder {
+    color: var(--text-muted);
+}
+
 .header-actions {
     display: flex;
     align-items: center;
@@ -491,6 +517,21 @@ body {
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 6px;
+}
+
+.property-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    margin-top: -4px;
+}
+
+.property-hint code {
+    background-color: var(--bg-tertiary);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Fira Code', 'Consolas', monospace;
+    font-size: 11px;
 }
 
 .property-input {

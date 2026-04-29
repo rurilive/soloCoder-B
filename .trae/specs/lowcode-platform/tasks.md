@@ -1,6 +1,6 @@
 # 低代码平台（仿Dify）- 实施计划 (Decomposed and Prioritized Task List)
 
-## [ ] Task 1: 项目基础设施搭建与初始化
+## [x] Task 1: 项目基础设施搭建与初始化
 - **Priority**: P0
 - **Depends On**: None
 - **Description**: 
@@ -17,7 +17,7 @@
 
 ---
 
-## [ ] Task 2: 定义工作流数据模型与存储
+## [x] Task 2: 定义工作流数据模型与存储
 - **Priority**: P0
 - **Depends On**: [Task 1]
 - **Description**: 
@@ -34,7 +34,7 @@
 
 ---
 
-## [ ] Task 3: 实现节点系统基础架构
+## [x] Task 3: 实现节点系统基础架构
 - **Priority**: P0
 - **Depends On**: [Task 2]
 - **Description**: 
@@ -53,7 +53,7 @@
 
 ---
 
-## [ ] Task 4: 实现工作流执行引擎 (逻辑层)
+## [x] Task 4: 实现工作流执行引擎 (逻辑层)
 - **Priority**: P0
 - **Depends On**: [Task 3]
 - **Description**: 
@@ -71,7 +71,7 @@
 
 ---
 
-## [ ] Task 5: 集成 RestrictedPython 实现安全沙箱
+## [x] Task 5: 集成 RestrictedPython 实现安全沙箱
 - **Priority**: P0
 - **Depends On**: [Task 4]
 - **Description**: 
@@ -89,7 +89,7 @@
 
 ---
 
-## [ ] Task 6: 实现后端 Flask API 服务
+## [x] Task 6: 实现后端 Flask API 服务
 - **Priority**: P0
 - **Depends On**: [Task 2, Task 5]
 - **Description**: 
@@ -113,7 +113,7 @@
 
 ---
 
-## [ ] Task 7: 实现前端基础框架与画布
+## [/] Task 7: 实现前端基础框架与画布
 - **Priority**: P0
 - **Depends On**: None (可与后端并行，但最终依赖 API)
 - **Description**: 
@@ -129,7 +129,7 @@
 
 ---
 
-## [ ] Task 8: 实现前端节点渲染与拖拽
+## [x] Task 8: 实现前端节点渲染与拖拽
 - **Priority**: P0
 - **Depends On**: [Task 7]
 - **Description**: 
@@ -146,7 +146,7 @@
 
 ---
 
-## [ ] Task 9: 实现前端连线系统 (Edge Rendering)
+## [x] Task 9: 实现前端连线系统 (Edge Rendering)
 - **Priority**: P0
 - **Depends On**: [Task 8]
 - **Description**: 
@@ -162,7 +162,7 @@
 
 ---
 
-## [ ] Task 10: 实现前端属性面板与数据绑定
+## [x] Task 10: 实现前端属性面板与数据绑定
 - **Priority**: P0
 - **Depends On**: [Task 8]
 - **Description**: 
@@ -195,7 +195,7 @@
 
 ---
 
-## [ ] Task 12: 前后端联调 - 执行与结果展示
+## [x] Task 12: 前后端联调 - 执行与结果展示
 - **Priority**: P1
 - **Depends On**: [Task 11]
 - **Description**: 
@@ -213,7 +213,7 @@
 
 ---
 
-## [ ] Task 13: 代码导出功能实现
+## [x] Task 13: 代码导出功能实现
 - **Priority**: P1
 - **Depends On**: [Task 4]
 - **Description**: 
@@ -229,7 +229,7 @@
 
 ---
 
-## [ ] Task 14: 整体测试与 Bug 修复
+## [x] Task 14: 整体测试与 Bug 修复
 - **Priority**: P1
 - **Depends On**: [Task 12, Task 13]
 - **Description**: 

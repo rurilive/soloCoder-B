@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>低代码平台 - Low-Code Platform</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="logo">
+                <span class="logo-icon">⚡</span>
+                <span class="logo-text">Low-Code Platform</span>
+            </div>
+            <div class="header-actions">
+                <select id="workflow-selector" class="workflow-selector">
+                    <option value="">-- 选择工作流 --</option>
+                </select>
+                <button id="btn-new" class="btn btn-secondary">
+                    <span class="btn-icon">📄</span> 新建
+                </button>
+                <button id="btn-save" class="btn btn-primary">
+                    <span class="btn-icon">💾</span> 保存
+                </button>
+                <button id="btn-run" class="btn btn-success">
+                    <span class="btn-icon">▶️</span> 运行
+                </button>
+                <button id="btn-export" class="btn btn-secondary">
+                    <span class="btn-icon">📥</span> 导出
+                </button>
+            </div>
+        </header>
+
+        <main class="app-main">
+            <aside class="sidebar left-sidebar">
+                <div class="sidebar-header">
+                    <h3>节点库</h3>
+                </div>
+                <div class="node-library">
+                    <div class="node-category">
+                        <div class="category-title">基础节点</div>
+                        <div class="node-items" id="node-items-basic">
+                            <div class="node-item" draggable="true" data-type="start">
+                                <span class="node-icon">🚀</span>
+                                <span class="node-name">Start</span>
+                            </div>
+                            <div class="node-item" draggable="true" data-type="end">
+                                <span class="node-icon">🏁</span>
+                                <span class="node-name">End</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="node-category">
+                        <div class="category-title">逻辑节点</div>
+                        <div class="node-items" id="node-items-logic">
+                            <div class="node-item" draggable="true" data-type="python_code">
+                                <span class="node-icon">🐍</span>
+                                <span class="node-name">Python Code</span>
+                            </div>
+                            <div class="node-item" draggable="true" data-type="condition">
+                                <span class="node-icon">🔀</span>
+                                <span class="node-name">Condition</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <div class="canvas-container" id="canvas-container">
+                <div class="canvas-wrapper" id="canvas-wrapper">
+                    <svg class="edge-layer" id="edge-layer">
+                        <defs>
+                            <marker id="arrowhead" markerWidth="10" markerHeight="7" 
+                                    refX="9" refY="3.5" orient="auto">
+                                <polygon points="0 0, 10 3.5, 0 7" fill="#666"/>
+                            </marker>
+                        </defs>
+                    </svg>
+                    <div class="node-layer" id="node-layer">
+                    </div>
+                </div>
+                <div class="canvas-controls">
+                    <button class="control-btn" id="btn-zoom-in" title="放大">+</button>
+                    <button class="control-btn" id="btn-zoom-out" title="缩小">−</button>
+                    <button class="control-btn" id="btn-reset-view" title="重置视图">⌂</button>
+                </div>
+            </div>
+
+            <aside class="sidebar right-sidebar">
+                <div class="sidebar-header">
+                    <h3>属性面板</h3>
+                </div>
+                <div class="properties-panel" id="properties-panel">
+                    <div class="no-selection" id="no-selection">
+                        <p>点击画布中的节点查看属性</p>
+                    </div>
+                    <div class="node-properties" id="node-properties" style="display: none;">
+                        <div class="property-group">
+                            <label class="property-label">节点 ID</label>
+                            <input type="text" id="prop-node-id" class="property-input" readonly>
+                        </div>
+                        <div class="property-group">
+                            <label class="property-label">节点类型</label>
+                            <input type="text" id="prop-node-type" class="property-input" readonly>
+                        </div>
+                        <div class="property-group" id="group-node-name">
+                            <label class="property-label">节点名称</label>
+                            <input type="text" id="prop-node-name" class="property-input" placeholder="输入节点名称">
+                        </div>
+                        <div class="property-group" id="group-start-params" style="display: none;">
+                            <label class="property-label">初始参数</label>
+                            <div class="params-editor" id="params-editor">
+                                <div class="params-header">
+                                    <span>Key</span>
+                                    <span>Value</span>
+                                    <span></span>
+                                </div>
+                                <div class="params-list" id="params-list"></div>
+                                <button class="btn-add-param" id="btn-add-param">+ 添加参数</button>
+                            </div>
+                        </div>
+                        <div class="property-group" id="group-code-editor" style="display: none;">
+                            <label class="property-label">Python 代码</label>
+                            <textarea id="code-editor" class="code-editor" rows="12" 
+                                      placeholder="# 编写你的 Python 代码&#10;# 输入变量可直接使用&#10;# 使用 result 变量或 return 语句输出结果&#10;&#10;result = 'Hello World'"></textarea>
+                        </div>
+                        <div class="property-group" id="group-condition" style="display: none;">
+                            <label class="property-label">条件表达式</label>
+                            <input type="text" id="prop-condition-expr" class="property-input" 
+                                   placeholder="例如: value > 10">
+                            <label class="property-label">真值输出</label>
+                            <input type="text" id="prop-true-value" class="property-input" 
+                                   placeholder="条件为真时的输出">
+                            <label class="property-label">假值输出</label>
+                            <input type="text" id="prop-false-value" class="property-input" 
+                                   placeholder="条件为假时的输出">
+                        </div>
+                        <div class="property-group delete-group">
+                            <button class="btn btn-danger" id="btn-delete-node">删除节点</button>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+
+        <div class="output-panel" id="output-panel">
+            <div class="output-header">
+                <span class="output-title">输出面板</span>
+                <div class="output-tabs">
+                    <button class="output-tab active" data-tab="logs">日志</button>
+                    <button class="output-tab" data-tab="result">结果</button>
+                    <button class="output-tab" data-tab="error">错误</button>
+                </div>
+                <button class="output-close" id="btn-close-output">×</button>
+            </div>
+            <div class="output-content">
+                <div class="output-tab-content active" id="output-logs">
+                    <pre class="output-text"></pre>
+                </div>
+                <div class="output-tab-content" id="output-result">
+                    <pre class="output-text"></pre>
+                </div>
+                <div class="output-tab-content" id="output-error">
+                    <pre class="output-text"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/utils.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/canvas.js"></script>
+    <script src="js/nodes.js"></script>
+    <script src="js/edges.js"></script>
+    <script src="js/properties.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

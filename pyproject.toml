@@ -1,0 +1,18 @@
+[project]
+name = "solocoder-b"
+version = "0.1.0"
+description = "低代码平台 - 可视化 Python 工作流编排工具"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "flask>=3.0.0",
+    "flask-cors>=4.0.0",
+    "restrictedpython>=7.0.0",
+]
+
+[tool.uv]
+preview = true
+
+[project.scripts]
+lowcode-server = "backend.server:main"
+

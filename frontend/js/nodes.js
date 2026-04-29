@@ -148,6 +148,19 @@ class NodeManager {
                 .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
                 .join(', ');
             bodyContent = `<div class="code-preview">${this.escapeHtml(params)}</div>`;
+        } else if (node.type === 'condition') {
+            const expr = node.config.params?.expression || 'value > 10';
+            bodyContent = `<div class="code-preview">${this.escapeHtml(expr)}</div>`;
+        }
+        
+        let outputHandles = '';
+        if (node.type === 'condition') {
+            outputHandles = `
+                <div class="node-handle output output-true" data-handle="output-true" data-node-id="${node.id}" title="True 分支"></div>
+                <div class="node-handle output output-false" data-handle="output-false" data-node-id="${node.id}" title="False 分支"></div>
+            `;
+        } else {
+            outputHandles = `<div class="node-handle output" data-handle="output" data-node-id="${node.id}"></div>`;
         }
         
         nodeEl.innerHTML = `
@@ -157,7 +170,7 @@ class NodeManager {
             </div>
             ${bodyContent ? `<div class="node-body">${bodyContent}</div>` : ''}
             <div class="node-handle input" data-handle="input" data-node-id="${node.id}"></div>
-            <div class="node-handle output" data-handle="output" data-node-id="${node.id}"></div>
+            ${outputHandles}
         `;
         
         this.container.appendChild(nodeEl);
@@ -175,7 +188,7 @@ class NodeManager {
             const nodeId = handle.dataset.nodeId;
             const handleType = handle.dataset.handle;
             
-            if (handleType === 'output' && window.App) {
+            if (handleType && handleType.startsWith('output') && window.App) {
                 const node = this.nodes.get(nodeId);
                 if (node) {
                     const rect = handle.getBoundingClientRect();
@@ -183,7 +196,7 @@ class NodeManager {
                     const centerY = rect.top + rect.height / 2;
                     const pos = this.canvasManager.screenToCanvas(centerX, centerY);
                     
-                    window.App.edgeManager.startConnection(nodeId, 'output', pos.x, pos.y);
+                    window.App.edgeManager.startConnection(nodeId, handleType, pos.x, pos.y);
                 }
             }
             e.stopPropagation();
@@ -349,7 +362,15 @@ class NodeManager {
         const nodeEl = document.getElementById(`node-${nodeId}`);
         if (!nodeEl) return null;
         
-        const handle = nodeEl.querySelector(`.node-handle.${handleType}`);
+        let handle = null;
+        if (handleType === 'output-true') {
+            handle = nodeEl.querySelector('.node-handle.output-true');
+        } else if (handleType === 'output-false') {
+            handle = nodeEl.querySelector('.node-handle.output-false');
+        } else {
+            handle = nodeEl.querySelector(`.node-handle.${handleType}`);
+        }
+        
         if (!handle) return null;
         
         const rect = handle.getBoundingClientRect();

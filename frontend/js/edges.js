@@ -80,13 +80,14 @@ class EdgeManager {
     }
 
     createEdge(fromNodeId, toNodeId) {
-        const edgeId = `${fromNodeId}_${toNodeId}`;
+        const sourceHandle = this.connectingFrom?.handleType || 'output';
+        const edgeId = `${fromNodeId}_${toNodeId}_${sourceHandle}`;
         
         const edge = {
             id: edgeId,
             source: fromNodeId,
             target: toNodeId,
-            sourceHandle: 'output',
+            sourceHandle: sourceHandle,
             targetHandle: 'input'
         };
         
@@ -101,7 +102,8 @@ class EdgeManager {
     }
 
     renderEdge(edge) {
-        const fromPos = this.nodeManager.getHandlePosition(edge.source, 'output');
+        const sourceHandle = edge.sourceHandle || 'output';
+        const fromPos = this.nodeManager.getHandlePosition(edge.source, sourceHandle);
         const toPos = this.nodeManager.getHandlePosition(edge.target, 'input');
         
         if (!fromPos || !toPos) return;

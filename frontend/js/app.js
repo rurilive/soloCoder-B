@@ -56,6 +56,10 @@ class App {
             }
         });
         
+        document.getElementById('btn-delete-workflow').addEventListener('click', () => {
+            this.deleteCurrentWorkflow();
+        });
+        
         document.querySelectorAll('.output-tab').forEach(tab => {
             tab.addEventListener('click', (e) => {
                 this.switchOutputTab(e.target.dataset.tab);
@@ -268,6 +272,42 @@ class App {
         } catch (error) {
             console.error('Export failed:', error);
             Utils.showToast('导出失败: ' + error.message, 'error');
+        }
+    }
+
+    async deleteCurrentWorkflow() {
+        if (!this.currentWorkflowId) {
+            Utils.showToast('当前工作流未保存，无需删除', 'info');
+            return;
+        }
+        
+        const workflowName = this.currentWorkflow?.name || '当前工作流';
+        if (!confirm(`确定要删除工作流 "${workflowName}" 吗？此操作不可撤销。`)) {
+            return;
+        }
+        
+        try {
+            await API.deleteWorkflow(this.currentWorkflowId);
+            
+            Utils.showToast(`工作流 "${workflowName}" 已删除`, 'success');
+            
+            this.currentWorkflowId = null;
+            this.currentWorkflow = null;
+            this.isUnsaved = false;
+            
+            this.nodeManager.loadNodes([]);
+            this.edgeManager.loadEdges([]);
+            this.nodeManager.clearSelection();
+            
+            document.getElementById('workflow-name').value = '新建工作流';
+            document.getElementById('workflow-selector').value = '';
+            
+            await this.loadWorkflows();
+            this.createNewWorkflow();
+            
+        } catch (error) {
+            console.error('Delete failed:', error);
+            Utils.showToast('删除失败: ' + error.message, 'error');
         }
     }
 

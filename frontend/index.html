@@ -14,9 +14,14 @@
                 <input type="text" id="workflow-name" class="workflow-name-input" placeholder="工作流名称" value="新建工作流">
             </div>
             <div class="header-actions">
-                <select id="workflow-selector" class="workflow-selector">
-                    <option value="">-- 选择工作流 --</option>
-                </select>
+                <div class="workflow-selector-wrapper">
+                    <select id="workflow-selector" class="workflow-selector">
+                        <option value="">-- 选择工作流 --</option>
+                    </select>
+                    <button id="btn-delete-workflow" class="btn btn-danger btn-small" title="删除当前工作流">
+                        <span class="btn-icon">🗑️</span>
+                    </button>
+                </div>
                 <button id="btn-new" class="btn btn-secondary">
                     <span class="btn-icon">📄</span> 新建
                 </button>

@@ -124,6 +124,25 @@ class WorkflowRunner:
         for edge in incoming_edges:
             source_id = edge.source
             source_output = self.node_outputs.get(source_id, {})
+            source_handle = edge.source_handle
+            
+            if source_handle == "output-true":
+                if isinstance(source_output, dict) and "true" in source_output:
+                    true_value = source_output.get("true")
+                    if isinstance(true_value, dict):
+                        inputs.update(true_value)
+                    elif true_value is not None:
+                        inputs["result"] = true_value
+                continue
+            
+            if source_handle == "output-false":
+                if isinstance(source_output, dict) and "false" in source_output:
+                    false_value = source_output.get("false")
+                    if isinstance(false_value, dict):
+                        inputs.update(false_value)
+                    elif false_value is not None:
+                        inputs["result"] = false_value
+                continue
             
             if isinstance(source_output, dict):
                 if "params" in source_output and len(source_output) == 1:

@@ -137,6 +137,17 @@ body {
     border-color: var(--primary-color);
 }
 
+.workflow-selector-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-small {
+    padding: 6px 10px;
+    min-width: auto;
+}
+
 .btn {
     display: inline-flex;
     align-items: center;
@@ -453,6 +464,30 @@ body {
 
 .node-handle.output:hover {
     transform: translateY(-50%) scale(1.2);
+}
+
+.node-handle.output-true {
+    right: -7px;
+    top: 30%;
+    transform: translateY(-50%);
+    background-color: #10b981;
+}
+
+.node-handle.output-true:hover {
+    transform: translateY(-50%) scale(1.2);
+    background-color: #059669;
+}
+
+.node-handle.output-false {
+    right: -7px;
+    top: 70%;
+    transform: translateY(-50%);
+    background-color: #ef4444;
+}
+
+.node-handle.output-false:hover {
+    transform: translateY(-50%) scale(1.2);
+    background-color: #dc2626;
 }
 
 .canvas-controls {

@@ -87,8 +87,8 @@ class EdgeManager {
             id: edgeId,
             source: fromNodeId,
             target: toNodeId,
-            sourceHandle: sourceHandle,
-            targetHandle: 'input'
+            source_handle: sourceHandle,
+            target_handle: 'input'
         };
         
         this.edges.set(edgeId, edge);
@@ -102,7 +102,7 @@ class EdgeManager {
     }
 
     renderEdge(edge) {
-        const sourceHandle = edge.sourceHandle || 'output';
+        const sourceHandle = edge.source_handle || edge.sourceHandle || 'output';
         const fromPos = this.nodeManager.getHandlePosition(edge.source, sourceHandle);
         const toPos = this.nodeManager.getHandlePosition(edge.target, 'input');
         

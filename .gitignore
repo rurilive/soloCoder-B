@@ -126,3 +126,6 @@ venv.bak/
 data/workflows/
 logs/
 *.pyc
+.server.pid
+server.log
+nohup.out

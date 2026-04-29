@@ -149,14 +149,36 @@ class ConditionNode(BaseNode):
         "true": {"type": "any", "description": "Output if condition is true"},
         "false": {"type": "any", "description": "Output if condition is false"}
     }
+    
+    SAFE_BUILTINS = {
+        'abs': abs,
+        'bool': bool,
+        'dict': dict,
+        'float': float,
+        'int': int,
+        'len': len,
+        'list': list,
+        'max': max,
+        'min': min,
+        'range': range,
+        'reversed': reversed,
+        'round': round,
+        'sorted': sorted,
+        'str': str,
+        'sum': sum,
+        'tuple': tuple,
+        'True': True,
+        'False': False,
+        'None': None,
+    }
 
     @classmethod
     def get_default_config(cls) -> NodeConfig:
         return NodeConfig(
             params={
-                "expression": "value is not None",
-                "true_value": None,
-                "false_value": None
+                "expression": "value > 10",
+                "true_value": {"result": "Value is greater than 10"},
+                "false_value": {"result": "Value is 10 or less"}
             }
         )
 
@@ -167,8 +189,10 @@ class ConditionNode(BaseNode):
         local_vars = {"value": value}
         local_vars.update(inputs)
         
+        safe_globals = {"__builtins__": self.SAFE_BUILTINS}
+        
         try:
-            condition_result = eval(expression, {"__builtins__": {}}, local_vars)
+            condition_result = eval(expression, safe_globals, local_vars)
         except Exception as e:
             raise RuntimeError(f"Condition evaluation error: {str(e)}") from e
         

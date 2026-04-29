@@ -200,9 +200,19 @@ class ConditionNode(BaseNode):
         false_value = self.config.params.get("false_value", None)
         
         if condition_result:
-            return {"true": true_value, "false": None, "condition": True}
+            return {
+                "true": true_value, 
+                "false": None, 
+                "condition": True,
+                "_inputs": inputs
+            }
         else:
-            return {"true": None, "false": false_value, "condition": False}
+            return {
+                "true": None, 
+                "false": false_value, 
+                "condition": False,
+                "_inputs": inputs
+            }
 
 
 class NodeRegistry:

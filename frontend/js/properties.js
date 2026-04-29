@@ -206,8 +206,7 @@ class PropertiesManager {
             }
         });
         
-        const newParams = { ...this.currentNode.config.params, ...params };
-        const newConfig = { ...this.currentNode.config, params: newParams };
+        const newConfig = { ...this.currentNode.config, params: params };
         
         this.nodeManager.updateNode(this.currentNode.id, {
             config: newConfig

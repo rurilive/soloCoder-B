@@ -135,9 +135,14 @@ class WorkflowRunner:
                         inputs.update(true_value)
                     elif true_value is not None:
                         inputs["result"] = true_value
+                    
+                    if isinstance(source_output, dict) and "_inputs" in source_output:
+                        original_inputs = source_output.get("_inputs", {})
+                        for key, value in original_inputs.items():
+                            if key not in inputs:
+                                inputs[key] = value
+                    
                     handled = True
-                else:
-                    pass
             
             elif source_handle == "output-false":
                 if isinstance(source_output, dict) and "false" in source_output:
@@ -146,9 +151,14 @@ class WorkflowRunner:
                         inputs.update(false_value)
                     elif false_value is not None:
                         inputs["result"] = false_value
+                    
+                    if isinstance(source_output, dict) and "_inputs" in source_output:
+                        original_inputs = source_output.get("_inputs", {})
+                        for key, value in original_inputs.items():
+                            if key not in inputs:
+                                inputs[key] = value
+                    
                     handled = True
-                else:
-                    pass
             
             if not handled:
                 if isinstance(source_output, dict):

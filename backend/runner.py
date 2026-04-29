@@ -126,6 +126,8 @@ class WorkflowRunner:
             source_output = self.node_outputs.get(source_id, {})
             source_handle = edge.source_handle
             
+            handled = False
+            
             if source_handle == "output-true":
                 if isinstance(source_output, dict) and "true" in source_output:
                     true_value = source_output.get("true")
@@ -133,26 +135,31 @@ class WorkflowRunner:
                         inputs.update(true_value)
                     elif true_value is not None:
                         inputs["result"] = true_value
-                continue
+                    handled = True
+                else:
+                    pass
             
-            if source_handle == "output-false":
+            elif source_handle == "output-false":
                 if isinstance(source_output, dict) and "false" in source_output:
                     false_value = source_output.get("false")
                     if isinstance(false_value, dict):
                         inputs.update(false_value)
                     elif false_value is not None:
                         inputs["result"] = false_value
-                continue
-            
-            if isinstance(source_output, dict):
-                if "params" in source_output and len(source_output) == 1:
-                    params = source_output["params"]
-                    if isinstance(params, dict):
-                        inputs.update(params)
+                    handled = True
                 else:
-                    inputs.update(source_output)
-            elif source_output is not None:
-                inputs["result"] = source_output
+                    pass
+            
+            if not handled:
+                if isinstance(source_output, dict):
+                    if "params" in source_output and len(source_output) == 1:
+                        params = source_output["params"]
+                        if isinstance(params, dict):
+                            inputs.update(params)
+                    else:
+                        inputs.update(source_output)
+                elif source_output is not None:
+                    inputs["result"] = source_output
         
         config_inputs = node_model.config.inputs
         for key, value in config_inputs.items():

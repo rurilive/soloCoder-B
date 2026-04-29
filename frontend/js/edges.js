@@ -20,7 +20,7 @@ class EdgeManager {
     }
 
     startConnection(nodeId, handleType, x, y) {
-        if (handleType !== 'output') return;
+        if (!handleType || !handleType.startsWith('output')) return;
         
         this.isConnecting = true;
         this.connectingFrom = { nodeId, handleType, x, y };

@@ -724,5 +724,338 @@ class TestInputResolution:
         assert inputs["msg"] == "Value is 10"
 
 
+class TestUnknownNodeType:
+    """Tests for handling unknown node types."""
+
+    def test_unknown_node_type_skipped(self):
+        """Test that unknown node types are skipped with warning."""
+        workflow = Workflow.create(name="Unknown Node Test")
+        
+        start = Node.create(
+            node_type="start",
+            position=Position(x=100, y=100),
+            config=NodeConfig(params={"value": 42})
+        )
+        
+        unknown = Node(
+            id="unknown_node",
+            type="non_existent_type",
+            position=Position(x=300, y=100),
+            config=NodeConfig()
+        )
+        
+        end = Node.create(
+            node_type="end",
+            position=Position(x=500, y=100)
+        )
+        
+        workflow.nodes = [start, unknown, end]
+        workflow.edges = [
+            Edge.create(source=start.id, target=unknown.id),
+            Edge.create(source=unknown.id, target=end.id),
+        ]
+        
+        runner = WorkflowRunner(workflow)
+        result = runner.run()
+        
+        assert result["status"] == "success"
+        assert any("Unknown node type" in log or "non_existent_type" in log for log in result["logs"])
+
+
+class TestNestedValueAccess:
+    """Tests for _get_nested_value method edge cases."""
+
+    def test_single_part_path_returns_node_output(self):
+        """Test that path with single part returns entire node output."""
+        workflow = Workflow.create(name="Single Part Test")
+        
+        runner = WorkflowRunner(workflow)
+        runner.node_outputs = {
+            "node": {"result": 42, "other": "value"}
+        }
+        
+        result = runner._get_nested_value("node")
+        assert result == {"result": 42, "other": "value"}
+
+    def test_empty_path_returns_none(self):
+        """Test that empty path returns None."""
+        workflow = Workflow.create(name="Empty Path Test")
+        
+        runner = WorkflowRunner(workflow)
+        result = runner._get_nested_value("")
+        assert result is None
+
+    def test_list_index_value_error_returns_none(self):
+        """Test that invalid list index returns None."""
+        workflow = Workflow.create(name="List Index Test")
+        
+        runner = WorkflowRunner(workflow)
+        runner.node_outputs = {
+            "data": {"result": [1, 2, 3]}
+        }
+        
+        result = runner._get_nested_value("data.result.invalid")
+        assert result is None
+
+    def test_list_index_out_of_range_returns_none(self):
+        """Test that list index out of range returns None."""
+        workflow = Workflow.create(name="List Range Test")
+        
+        runner = WorkflowRunner(workflow)
+        runner.node_outputs = {
+            "data": {"result": [1, 2, 3]}
+        }
+        
+        result = runner._get_nested_value("data.result.100")
+        assert result is None
+
+    def test_non_dict_list_getattr(self):
+        """Test getattr access on objects (simulated with tuple)."""
+        workflow = Workflow.create(name="Getattr Test")
+        
+        class TestObj:
+            def __init__(self):
+                self.value = 42
+        
+        runner = WorkflowRunner(workflow)
+        runner.node_outputs = {
+            "node": {"obj": TestObj()}
+        }
+        
+        result = runner._get_nested_value("node.obj.value")
+        assert result == 42
+
+
+class TestSourceHandleInputs:
+    """Tests for source_handle based input resolution."""
+
+    def test_output_true_handle_with_dict_value(self):
+        """Test source_handle='output-true' with dict value."""
+        workflow = Workflow.create(name="True Handle Test")
+        
+        condition = Node.create(
+            node_type="condition",
+            position=Position(x=100, y=100),
+            config=NodeConfig()
+        )
+        
+        code = Node.create(
+            node_type="python_code",
+            position=Position(x=300, y=100),
+            config=NodeConfig(code="")
+        )
+        
+        workflow.nodes = [condition, code]
+        workflow.edges = [
+            Edge.create(
+                source=condition.id, 
+                target=code.id,
+                source_handle="output-true"
+            ),
+        ]
+        
+        runner = WorkflowRunner(workflow)
+        runner.node_outputs[condition.id] = {
+            "true": {"x": 10, "y": 20},
+            "_inputs": {"extra": "value"}
+        }
+        
+        inputs = runner._resolve_inputs(code)
+        
+        assert inputs["x"] == 10
+        assert inputs["y"] == 20
+        assert inputs["extra"] == "value"
+
+    def test_output_true_handle_with_non_dict_value(self):
+        """Test source_handle='output-true' with non-dict value."""
+        workflow = Workflow.create(name="True Handle Non-Dict Test")
+        
+        condition = Node.create(
+            node_type="condition",
+            position=Position(x=100, y=100),
+            config=NodeConfig()
+        )
+        
+        code = Node.create(
+            node_type="python_code",
+            position=Position(x=300, y=100),
+            config=NodeConfig(code="")
+        )
+        
+        workflow.nodes = [condition, code]
+        workflow.edges = [
+            Edge.create(
+                source=condition.id, 
+                target=code.id,
+                source_handle="output-true"
+            ),
+        ]
+        
+        runner = WorkflowRunner(workflow)
+        runner.node_outputs[condition.id] = {
+            "true": 42
+        }
+        
+        inputs = runner._resolve_inputs(code)
+        
+        assert inputs["result"] == 42
+
+    def test_output_false_handle_with_dict_value(self):
+        """Test source_handle='output-false' with dict value."""
+        workflow = Workflow.create(name="False Handle Test")
+        
+        condition = Node.create(
+            node_type="condition",
+            position=Position(x=100, y=100),
+            config=NodeConfig()
+        )
+        
+        code = Node.create(
+            node_type="python_code",
+            position=Position(x=300, y=100),
+            config=NodeConfig(code="")
+        )
+        
+        workflow.nodes = [condition, code]
+        workflow.edges = [
+            Edge.create(
+                source=condition.id, 
+                target=code.id,
+                source_handle="output-false"
+            ),
+        ]
+        
+        runner = WorkflowRunner(workflow)
+        runner.node_outputs[condition.id] = {
+            "false": {"a": 1, "b": 2},
+            "_inputs": {"backup": "value"}
+        }
+        
+        inputs = runner._resolve_inputs(code)
+        
+        assert inputs["a"] == 1
+        assert inputs["b"] == 2
+        assert inputs["backup"] == "value"
+
+    def test_output_false_handle_with_non_dict_value(self):
+        """Test source_handle='output-false' with non-dict value."""
+        workflow = Workflow.create(name="False Handle Non-Dict Test")
+        
+        condition = Node.create(
+            node_type="condition",
+            position=Position(x=100, y=100),
+            config=NodeConfig()
+        )
+        
+        code = Node.create(
+            node_type="python_code",
+            position=Position(x=300, y=100),
+            config=NodeConfig(code="")
+        )
+        
+        workflow.nodes = [condition, code]
+        workflow.edges = [
+            Edge.create(
+                source=condition.id, 
+                target=code.id,
+                source_handle="output-false"
+            ),
+        ]
+        
+        runner = WorkflowRunner(workflow)
+        runner.node_outputs[condition.id] = {
+            "false": "error message"
+        }
+        
+        inputs = runner._resolve_inputs(code)
+        
+        assert inputs["result"] == "error message"
+
+    def test_non_dict_source_output(self):
+        """Test when source_output is not a dict and not None."""
+        workflow = Workflow.create(name="Non-Dict Output Test")
+        
+        start = Node.create(
+            node_type="start",
+            position=Position(x=100, y=100)
+        )
+        
+        code = Node.create(
+            node_type="python_code",
+            position=Position(x=300, y=100),
+            config=NodeConfig(code="")
+        )
+        
+        workflow.nodes = [start, code]
+        workflow.edges = [
+            Edge.create(source=start.id, target=code.id),
+        ]
+        
+        runner = WorkflowRunner(workflow)
+        runner.node_outputs[start.id] = 42
+        
+        inputs = runner._resolve_inputs(code)
+        
+        assert inputs["result"] == 42
+
+    def test_source_output_with_params_key_only(self):
+        """Test source_output with only 'params' key."""
+        workflow = Workflow.create(name="Params Only Test")
+        
+        start = Node.create(
+            node_type="start",
+            position=Position(x=100, y=100)
+        )
+        
+        code = Node.create(
+            node_type="python_code",
+            position=Position(x=300, y=100),
+            config=NodeConfig(code="")
+        )
+        
+        workflow.nodes = [start, code]
+        workflow.edges = [
+            Edge.create(source=start.id, target=code.id),
+        ]
+        
+        runner = WorkflowRunner(workflow)
+        runner.node_outputs[start.id] = {"params": {"x": 10, "y": 20}}
+        
+        inputs = runner._resolve_inputs(code)
+        
+        assert inputs["x"] == 10
+        assert inputs["y"] == 20
+
+
+class TestNoFinalResult:
+    """Tests for workflow with no __final_result__ but has end node."""
+
+    def test_end_node_output_used_as_final_result(self):
+        """Test that end node output is used when no __final_result__."""
+        workflow = Workflow.create(name="End Node Result Test")
+        
+        start = Node.create(
+            node_type="start",
+            position=Position(x=100, y=100),
+            config=NodeConfig(params={"value": 100})
+        )
+        
+        end = Node.create(
+            node_type="end",
+            position=Position(x=300, y=100)
+        )
+        
+        workflow.nodes = [start, end]
+        workflow.edges = [
+            Edge.create(source=start.id, target=end.id),
+        ]
+        
+        runner = WorkflowRunner(workflow)
+        result = runner.run()
+        
+        assert result["status"] == "success"
+        assert result["result"] is not None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

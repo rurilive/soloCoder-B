@@ -349,5 +349,160 @@ class TestSandboxResult:
         assert result.stderr == ""
 
 
+class TestSafeGlobals:
+    """Tests for _get_safe_globals security functions."""
+
+    def test_get_safe_globals_returns_dict(self):
+        """Test that _get_safe_globals returns a dictionary."""
+        sandbox = CodeSandbox()
+        safe_globals = sandbox._get_safe_globals()
+        
+        assert isinstance(safe_globals, dict)
+        assert "__builtins__" in safe_globals
+        assert "_getattr_" in safe_globals
+        assert "_setattr_" in safe_globals
+        assert "_getitem_" in safe_globals
+        assert "_getiter_" in safe_globals
+        assert "_write_" in safe_globals
+
+    def test_safe_getattr_allows_public_attrs(self):
+        """Test that _getattr_ allows public attributes on basic types."""
+        sandbox = CodeSandbox()
+        safe_globals = sandbox._get_safe_globals()
+        getattr_func = safe_globals["_getattr_"]
+        
+        result = getattr_func("hello", "upper")
+        assert callable(result)
+
+    def test_safe_getattr_blocks_private_attrs(self):
+        """Test that _getattr_ blocks private attributes."""
+        sandbox = CodeSandbox()
+        safe_globals = sandbox._get_safe_globals()
+        getattr_func = safe_globals["_getattr_"]
+        
+        with pytest.raises(AttributeError):
+            getattr_func("hello", "__class__")
+
+    def test_safe_setattr_blocks_basic_types(self):
+        """Test that _setattr_ blocks setting attributes on basic types."""
+        sandbox = CodeSandbox()
+        safe_globals = sandbox._get_safe_globals()
+        setattr_func = safe_globals["_setattr_"]
+        
+        with pytest.raises(TypeError):
+            setattr_func({}, "key", "value")
+
+    def test_safe_setattr_blocks_private_attrs(self):
+        """Test that _setattr_ blocks setting private attributes."""
+        sandbox = CodeSandbox()
+        safe_globals = sandbox._get_safe_globals()
+        setattr_func = safe_globals["_setattr_"]
+        
+        class CustomObj:
+            pass
+        
+        obj = CustomObj()
+        
+        with pytest.raises(AttributeError):
+            setattr_func(obj, "__secret", "value")
+
+    def test_safe_import_allows_allowed_modules(self):
+        """Test that safe_import allows whitelisted modules."""
+        sandbox = CodeSandbox()
+        safe_globals = sandbox._get_safe_globals()
+        builtins = safe_globals["__builtins__"]
+        import_func = builtins["__import__"]
+        
+        math_module = import_func("math")
+        assert math_module is not None
+
+    def test_safe_import_blocks_non_allowed_modules(self):
+        """Test that safe_import blocks non-whitelisted modules."""
+        sandbox = CodeSandbox()
+        safe_globals = sandbox._get_safe_globals()
+        builtins = safe_globals["__builtins__"]
+        import_func = builtins["__import__"]
+        
+        with pytest.raises(ImportError):
+            import_func("os")
+
+
+class TestExecuteRestrictedErrors:
+    """Tests for error handling in _execute_restricted."""
+
+    def test_execute_restricted_syntax_error(self):
+        """Test syntax error handling in restricted execution."""
+        sandbox = CodeSandbox()
+        local_vars = {}
+        
+        invalid_code = "result = 1 + "
+        
+        with pytest.raises(SyntaxError):
+            sandbox._execute_restricted(invalid_code, local_vars)
+
+    def test_execute_restricted_runtime_error(self):
+        """Test runtime error handling in restricted execution."""
+        sandbox = CodeSandbox()
+        local_vars = {}
+        
+        error_code = "result = 1 / 0"
+        
+        with pytest.raises(ZeroDivisionError):
+            sandbox._execute_restricted(error_code, local_vars)
+
+
+class TestProcessCodeTokenizeFail:
+    """Tests for tokenize failure handling in _process_code."""
+
+    def test_process_code_invalid_syntax_returns_original(self):
+        """Test that invalid syntax returns original code."""
+        sandbox = CodeSandbox()
+        
+        invalid_code = "def incomplete("
+        
+        result = sandbox._process_code(invalid_code)
+        assert result == invalid_code
+
+
+class TestStdoutCapture:
+    """Tests for stdout capture in execute method."""
+
+    def test_execute_captures_print_output(self):
+        """Test that print statements are captured in logs."""
+        sandbox = CodeSandbox()
+        
+        code = """
+print("Hello from sandbox")
+result = 42
+"""
+        sandbox.execute(MockNode(code), {}, {})
+        
+        assert any("Hello from sandbox" in log for log in sandbox.logs)
+
+
+class TestExecuteUnrestricted:
+    """Tests for _execute_unrestricted method."""
+
+    def test_execute_unrestricted_basic(self):
+        """Test basic execution in unrestricted mode."""
+        sandbox = CodeSandbox()
+        local_vars = {"result": None}
+        
+        code = "result = 10 + 20"
+        sandbox._execute_unrestricted(code, local_vars)
+        
+        assert local_vars["result"] == 30
+
+    def test_execute_unrestricted_with_return_processed(self):
+        """Test unrestricted execution with processed return statement."""
+        sandbox = CodeSandbox()
+        local_vars = {"result": None}
+        
+        code = "result = 'test value'"
+        sandbox._execute_unrestricted(code, local_vars)
+        
+        assert local_vars["result"] == "test value"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

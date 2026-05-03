@@ -76,10 +76,17 @@ def create_app():
             return jsonify({"error": "Workflow not found"}), 404
         
         try:
-            from .runner import WorkflowRunner
+            from .runner import WorkflowRunner, LogLevel
             from .sandbox import CodeSandbox
             
-            runner = WorkflowRunner(workflow, CodeSandbox())
+            data = request.get_json() or {}
+            log_level_str = data.get("log_level", "INFO")
+            try:
+                log_level = LogLevel.from_string(log_level_str)
+            except ValueError:
+                log_level = LogLevel.INFO
+            
+            runner = WorkflowRunner(workflow, CodeSandbox(), log_level)
             result = runner.run()
             return jsonify(result)
         except ImportError as e:

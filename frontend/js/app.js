@@ -5,6 +5,15 @@ class App {
         this.isUnsaved = false;
         this.isRunning = false;
         
+        this.logLevelValues = {
+            'DEBUG': 10,
+            'INFO': 20,
+            'WARNING': 30,
+            'ERROR': 40
+        };
+        this.currentLogLevel = 'INFO';
+        this.allLogs = [];
+        
         this.canvasManager = null;
         this.nodeManager = null;
         this.edgeManager = null;
@@ -68,6 +77,12 @@ class App {
         
         document.getElementById('btn-close-output').addEventListener('click', () => {
             this.hideOutputPanel();
+        });
+        
+        const logLevelSelector = document.getElementById('log-level-selector');
+        logLevelSelector.addEventListener('change', (e) => {
+            this.currentLogLevel = e.target.value;
+            this.filterLogsByLevel();
         });
         
         window.addEventListener('beforeunload', (e) => {
@@ -207,17 +222,27 @@ class App {
         
         this.showOutputPanel();
         this.clearOutput();
-        this.appendLog('▶️ 开始执行工作流...\n');
+        this.appendLog({
+            level: 'INFO',
+            message: '▶️ 开始执行工作流...',
+            timestamp: new Date().toISOString()
+        });
         
         try {
-            const result = await API.runWorkflow(this.currentWorkflowId);
+            const result = await API.runWorkflow(this.currentWorkflowId, {
+                log_level: this.currentLogLevel
+            });
             
             if (result.status === 'success') {
-                this.appendLog('✅ 执行成功！\n');
+                this.appendLog({
+                    level: 'INFO',
+                    message: '✅ 执行成功！',
+                    timestamp: new Date().toISOString()
+                });
                 
                 if (result.logs) {
                     result.logs.forEach(log => {
-                        this.appendLog(log + '\n');
+                        this.appendLog(log);
                     });
                 }
                 
@@ -227,15 +252,27 @@ class App {
                 
                 Utils.showToast('执行成功', 'success');
             } else {
-                this.appendLog('❌ 执行失败\n');
+                this.appendLog({
+                    level: 'ERROR',
+                    message: '❌ 执行失败',
+                    timestamp: new Date().toISOString()
+                });
                 if (result.error) {
                     this.setOutputError(result.error);
-                    this.appendLog('错误: ' + result.error + '\n');
+                    this.appendLog({
+                        level: 'ERROR',
+                        message: '错误: ' + result.error,
+                        timestamp: new Date().toISOString()
+                    });
                 }
                 Utils.showToast('执行失败', 'error');
             }
         } catch (error) {
-            this.appendLog('❌ 请求失败: ' + error.message + '\n');
+            this.appendLog({
+                level: 'ERROR',
+                message: '❌ 请求失败: ' + error.message,
+                timestamp: new Date().toISOString()
+            });
             this.setOutputError(error.message);
             Utils.showToast('执行请求失败', 'error');
         } finally {
@@ -344,13 +381,57 @@ class App {
         document.querySelector('#output-logs .output-text').textContent = '';
         document.querySelector('#output-result .output-text').textContent = '';
         document.querySelector('#output-error .output-text').textContent = '';
+        this.allLogs = [];
     }
 
-    appendLog(text) {
+    appendLog(logEntry) {
+        if (typeof logEntry === 'string') {
+            logEntry = {
+                level: 'INFO',
+                message: logEntry,
+                timestamp: new Date().toISOString()
+            };
+        }
+        
+        this.allLogs.push(logEntry);
+        
+        if (this.shouldShowLog(logEntry.level)) {
+            this.displayLogEntry(logEntry);
+        }
+    }
+
+    shouldShowLog(logLevel) {
+        return this.logLevelValues[logLevel] >= this.logLevelValues[this.currentLogLevel];
+    }
+
+    displayLogEntry(logEntry) {
         const logOutput = document.querySelector('#output-logs .output-text');
-        logOutput.textContent += text;
+        const formattedLog = this.formatLogEntry(logEntry);
+        logOutput.innerHTML += formattedLog;
         logOutput.scrollTop = logOutput.scrollHeight;
         this.switchOutputTab('logs');
+    }
+
+    formatLogEntry(logEntry) {
+        const level = logEntry.level || 'INFO';
+        const message = logEntry.message || '';
+        const timestamp = logEntry.timestamp || '';
+        
+        const timeStr = timestamp ? new Date(timestamp).toLocaleTimeString() : '';
+        const levelClass = `log-level-${level.toLowerCase()}`;
+        
+        return `<span class="${levelClass}">[${level}] ${timeStr} ${message}</span>\n`;
+    }
+
+    filterLogsByLevel() {
+        const logOutput = document.querySelector('#output-logs .output-text');
+        logOutput.innerHTML = '';
+        
+        this.allLogs.forEach(logEntry => {
+            if (this.shouldShowLog(logEntry.level)) {
+                this.displayLogEntry(logEntry);
+            }
+        });
     }
 
     setOutputResult(data) {

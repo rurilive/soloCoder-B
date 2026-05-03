@@ -1,24 +1,43 @@
 from typing import Any, Dict, List, Set, Optional
 from collections import deque
+from enum import Enum
 
 from .models import Workflow, Node, Edge
 from .nodes import NodeRegistry, BaseNode
 
 
+class LogLevel(Enum):
+    DEBUG = 10
+    INFO = 20
+    WARNING = 30
+    ERROR = 40
+    
+    @classmethod
+    def from_string(cls, level_str: str) -> 'LogLevel':
+        level_map = {
+            'DEBUG': cls.DEBUG,
+            'INFO': cls.INFO,
+            'WARNING': cls.WARNING,
+            'ERROR': cls.ERROR,
+        }
+        return level_map.get(level_str.upper(), cls.INFO)
+
+
 class WorkflowRunner:
-    def __init__(self, workflow: Workflow, sandbox: Optional[Any] = None):
+    def __init__(self, workflow: Workflow, sandbox: Optional[Any] = None, log_level: LogLevel = LogLevel.INFO):
         self.workflow = workflow
         self.sandbox = sandbox
+        self.log_level = log_level
         self.node_outputs: Dict[str, Any] = {}
         self.context: Dict[str, Any] = {}
-        self.logs: List[str] = []
+        self.logs: List[Dict[str, Any]] = []
 
     def run(self) -> Dict[str, Any]:
         try:
-            self.log(f"Starting workflow: {self.workflow.name}")
+            self.log(f"Starting workflow: {self.workflow.name}", LogLevel.INFO)
             
             execution_order = self._topological_sort()
-            self.log(f"Execution order: {[n.id for n in execution_order]}")
+            self.log(f"Execution order: {[n.id for n in execution_order]}", LogLevel.DEBUG)
             
             for node_model in execution_order:
                 self._execute_node(node_model)
@@ -30,7 +49,7 @@ class WorkflowRunner:
                     end_node_id = end_nodes[0].id
                     final_result = self.node_outputs.get(end_node_id)
             
-            self.log("Workflow execution completed successfully")
+            self.log("Workflow execution completed successfully", LogLevel.INFO)
             
             return {
                 "status": "success",
@@ -40,9 +59,9 @@ class WorkflowRunner:
             }
             
         except Exception as e:
-            self.log(f"Error: {str(e)}")
+            self.log(f"Error: {str(e)}", LogLevel.ERROR)
             import traceback
-            self.log(traceback.format_exc())
+            self.log(traceback.format_exc(), LogLevel.ERROR)
             
             return {
                 "status": "error",
@@ -91,13 +110,13 @@ class WorkflowRunner:
     def _execute_node(self, node_model: Node) -> None:
         node = NodeRegistry.create_node(node_model)
         if node is None:
-            self.log(f"Warning: Unknown node type '{node_model.type}', skipping")
+            self.log(f"Warning: Unknown node type '{node_model.type}', skipping", LogLevel.WARNING)
             return
         
-        self.log(f"Executing node: {node_model.id} (type: {node_model.type})")
+        self.log(f"Executing node: {node_model.id} (type: {node_model.type})", LogLevel.INFO)
         
         inputs = self._resolve_inputs(node_model)
-        self.log(f"  Inputs: {inputs}")
+        self.log(f"  Inputs: {inputs}", LogLevel.DEBUG)
         
         try:
             from .nodes import PythonCodeNode
@@ -108,10 +127,10 @@ class WorkflowRunner:
                 output = node.execute(inputs, self.context)
             
             self.node_outputs[node_model.id] = output
-            self.log(f"  Output: {output}")
+            self.log(f"  Output: {output}", LogLevel.DEBUG)
             
         except Exception as e:
-            self.log(f"  Error executing node {node_model.id}: {str(e)}")
+            self.log(f"  Error executing node {node_model.id}: {str(e)}", LogLevel.ERROR)
             raise
 
     def _resolve_inputs(self, node_model: Node) -> Dict[str, Any]:
@@ -243,6 +262,15 @@ class WorkflowRunner:
         
         return current
 
-    def log(self, message: str) -> None:
-        self.logs.append(message)
-        print(f"[Runner] {message}")
+    def log(self, message: str, level: LogLevel = LogLevel.INFO) -> None:
+        log_entry = {
+            "level": level.name,
+            "message": message,
+            "timestamp": self._get_timestamp()
+        }
+        self.logs.append(log_entry)
+        print(f"[Runner] [{level.name}] {message}")
+    
+    def _get_timestamp(self) -> str:
+        from datetime import datetime
+        return datetime.now().isoformat()

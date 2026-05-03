@@ -58,9 +58,10 @@ const API = {
         });
     },
 
-    async runWorkflow(workflowId) {
+    async runWorkflow(workflowId, options = {}) {
         return this.request(`/workflows/${workflowId}/run`, {
-            method: 'POST'
+            method: 'POST',
+            body: JSON.stringify(options)
         });
     },
 

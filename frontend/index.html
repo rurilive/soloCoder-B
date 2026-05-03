@@ -153,6 +153,15 @@
         <div class="output-panel" id="output-panel">
             <div class="output-header">
                 <span class="output-title">输出面板</span>
+                <div class="output-controls">
+                    <label class="log-level-label">日志级别:</label>
+                    <select id="log-level-selector" class="log-level-selector">
+                        <option value="DEBUG">DEBUG</option>
+                        <option value="INFO" selected>INFO</option>
+                        <option value="WARNING">WARNING</option>
+                        <option value="ERROR">ERROR</option>
+                    </select>
+                </div>
                 <div class="output-tabs">
                     <button class="output-tab active" data-tab="logs">日志</button>
                     <button class="output-tab" data-tab="result">结果</button>

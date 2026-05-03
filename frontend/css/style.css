@@ -730,6 +730,70 @@ body {
     border-bottom: 1px solid var(--border-color);
 }
 
+.output-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.log-level-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.log-level-selector {
+    padding: 4px 8px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-color);
+    font-size: 12px;
+    cursor: pointer;
+    min-width: 100px;
+}
+
+.log-level-selector:hover {
+    border-color: var(--border-light);
+}
+
+.log-level-selector:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.log-level-option-debug {
+    color: #60a5fa;
+}
+
+.log-level-option-info {
+    color: #34d399;
+}
+
+.log-level-option-warning {
+    color: #fbbf24;
+}
+
+.log-level-option-error {
+    color: #f87171;
+}
+
+.log-level-debug {
+    color: #60a5fa;
+}
+
+.log-level-info {
+    color: #34d399;
+}
+
+.log-level-warning {
+    color: #fbbf24;
+}
+
+.log-level-error {
+    color: #f87171;
+}
+
 .output-title {
     font-size: 13px;
     font-weight: 600;

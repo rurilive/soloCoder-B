@@ -16,6 +16,22 @@ const validatePasswordComplexity = (password) => {
   };
 };
 
+const formatErrorDetail = (detail) => {
+  if (typeof detail === 'string') {
+    return detail;
+  }
+  if (Array.isArray(detail)) {
+    return detail.map(err => {
+      if (err.msg) {
+        const field = err.loc && err.loc.length > 0 ? err.loc[err.loc.length - 1] : '';
+        return field ? `${field}: ${err.msg}` : err.msg;
+      }
+      return String(err);
+    }).join('; ');
+  }
+  return String(detail);
+};
+
 const UserSelector = ({ currentUser, onUserChange, onAuthStatusChange }) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -69,7 +85,7 @@ const UserSelector = ({ currentUser, onUserChange, onAuthStatusChange }) => {
       setSuccess('注册并登录成功！');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError(err.response?.data?.detail || '创建用户失败');
+      setError(formatErrorDetail(err.response?.data?.detail) || '创建用户失败');
     }
   };
 
@@ -100,7 +116,7 @@ const UserSelector = ({ currentUser, onUserChange, onAuthStatusChange }) => {
       setSuccess('登录成功！');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError(err.response?.data?.detail || '登录失败');
+      setError(formatErrorDetail(err.response?.data?.detail) || '登录失败');
     }
   };
 

@@ -8,6 +8,12 @@ from pydantic import BaseModel, Field, validator
 class UserBase(BaseModel):
     username: str = Field(..., min_length=2, max_length=50)
     email: Optional[str] = Field(None, min_length=5, max_length=100)
+    
+    @validator('email')
+    def empty_email_to_none(cls, v):
+        if v is None or v.strip() == '':
+            return None
+        return v
 
 
 def validate_password_complexity(password: str) -> str:

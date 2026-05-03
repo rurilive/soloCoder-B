@@ -1,3 +1,4 @@
+import hashlib
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -19,12 +20,27 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
 
 
+def _preprocess_password(password: str) -> str:
+    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    preprocessed = _preprocess_password(plain_password)
+    try:
+        if pwd_context.verify(preprocessed, hashed_password):
+            return True
+    except Exception:
+        pass
+    
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception:
+        return False
 
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    preprocessed = _preprocess_password(password)
+    return pwd_context.hash(preprocessed)
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:

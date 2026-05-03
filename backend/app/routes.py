@@ -9,9 +9,12 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.models import User, Event, Meeting, MeetingParticipant
 from app.schemas import (
-    UserCreate, UserResponse,
+    UserCreate, UserResponse, UserLogin, Token,
     EventCreate, EventResponse,
     MeetingCreate, MeetingResponse,
+)
+from app.auth import (
+    get_password_hash, verify_password, create_access_token, get_current_user
 )
 
 router = APIRouter()
@@ -29,22 +32,50 @@ async def create_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
             detail="用户名或邮箱已存在"
         )
     
-    new_user = User(username=user.username, email=user.email)
+    hashed_password = get_password_hash(user.password)
+    new_user = User(
+        username=user.username, 
+        email=user.email, 
+        hashed_password=hashed_password
+    )
     db.add(new_user)
     await db.commit()
     await db.refresh(new_user)
     return new_user
 
 
+@router.post("/users/login", response_model=Token)
+async def login(user: UserLogin, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.username == user.username))
+    db_user = result.scalar_one_or_none()
+    
+    if not db_user or not verify_password(user.password, db_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="用户名或密码错误",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    access_token = create_access_token(data={"sub": db_user.id})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
 @router.get("/users/", response_model=List[UserResponse])
-async def get_users(db: AsyncSession = Depends(get_db)):
+async def get_users(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     result = await db.execute(select(User))
     users = result.scalars().all()
     return users
 
 
 @router.get("/users/{user_id}", response_model=UserResponse)
-async def get_user(user_id: int, db: AsyncSession = Depends(get_db)):
+async def get_user(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
@@ -53,11 +84,16 @@ async def get_user(user_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/events/", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
-async def create_event(event: EventCreate, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.id == event.owner_id))
-    owner = result.scalar_one_or_none()
-    if not owner:
-        raise HTTPException(status_code=400, detail="用户不存在")
+async def create_event(
+    event: EventCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    if event.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="只能创建自己的日程"
+        )
     
     new_event = Event(
         title=event.title,
@@ -81,6 +117,7 @@ async def create_event(event: EventCreate, db: AsyncSession = Depends(get_db)):
 async def get_events(
     user_id: Optional[int] = None,
     is_public: Optional[bool] = None,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     query = select(Event).options(selectinload(Event.owner))
@@ -92,17 +129,34 @@ async def get_events(
     
     result = await db.execute(query)
     events = result.scalars().all()
-    return events
+    
+    filtered_events = []
+    for event in events:
+        if event.is_public or event.owner_id == current_user.id:
+            filtered_events.append(event)
+    
+    return filtered_events
 
 
 @router.get("/events/{event_id}", response_model=EventResponse)
-async def get_event(event_id: int, db: AsyncSession = Depends(get_db)):
+async def get_event(
+    event_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     result = await db.execute(
         select(Event).options(selectinload(Event.owner)).where(Event.id == event_id)
     )
     event = result.scalar_one_or_none()
     if not event:
         raise HTTPException(status_code=404, detail="事件不存在")
+    
+    if not event.is_public and event.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="无权查看此日程"
+        )
+    
     return event
 
 
@@ -110,12 +164,19 @@ async def get_event(event_id: int, db: AsyncSession = Depends(get_db)):
 async def update_event(
     event_id: int,
     event_data: EventCreate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     result = await db.execute(select(Event).where(Event.id == event_id))
     event = result.scalar_one_or_none()
     if not event:
         raise HTTPException(status_code=404, detail="事件不存在")
+    
+    if event.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="只能修改自己的日程"
+        )
     
     for key, value in event_data.model_dump().items():
         setattr(event, key, value)
@@ -129,18 +190,38 @@ async def update_event(
 
 
 @router.delete("/events/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_event(event_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_event(
+    event_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     result = await db.execute(select(Event).where(Event.id == event_id))
     event = result.scalar_one_or_none()
     if not event:
         raise HTTPException(status_code=404, detail="事件不存在")
+    
+    if event.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="只能删除自己的日程"
+        )
     
     await db.delete(event)
     await db.commit()
 
 
 @router.post("/meetings/", response_model=MeetingResponse, status_code=status.HTTP_201_CREATED)
-async def create_meeting(meeting: MeetingCreate, db: AsyncSession = Depends(get_db)):
+async def create_meeting(
+    meeting: MeetingCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    if meeting.organizer_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="只能以自己的身份组织会议"
+        )
+    
     result = await db.execute(select(User).where(User.id == meeting.organizer_id))
     organizer = result.scalar_one_or_none()
     if not organizer:
@@ -182,6 +263,7 @@ async def create_meeting(meeting: MeetingCreate, db: AsyncSession = Depends(get_
 async def get_meetings(
     organizer_id: Optional[int] = None,
     participant_id: Optional[int] = None,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     query = select(Meeting).options(
@@ -197,11 +279,23 @@ async def get_meetings(
     
     result = await db.execute(query)
     meetings = result.scalars().all()
-    return meetings
+    
+    filtered_meetings = []
+    for meeting in meetings:
+        is_organizer = meeting.organizer_id == current_user.id
+        is_participant = any(p.user_id == current_user.id for p in meeting.participants)
+        if is_organizer or is_participant:
+            filtered_meetings.append(meeting)
+    
+    return filtered_meetings
 
 
 @router.get("/meetings/{meeting_id}", response_model=MeetingResponse)
-async def get_meeting(meeting_id: int, db: AsyncSession = Depends(get_db)):
+async def get_meeting(
+    meeting_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     result = await db.execute(
         select(Meeting)
         .options(selectinload(Meeting.organizer), selectinload(Meeting.participants).selectinload(MeetingParticipant.user))
@@ -210,6 +304,15 @@ async def get_meeting(meeting_id: int, db: AsyncSession = Depends(get_db)):
     meeting = result.scalar_one_or_none()
     if not meeting:
         raise HTTPException(status_code=404, detail="会议不存在")
+    
+    is_organizer = meeting.organizer_id == current_user.id
+    is_participant = any(p.user_id == current_user.id for p in meeting.participants)
+    if not is_organizer and not is_participant:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="无权查看此会议"
+        )
+    
     return meeting
 
 
@@ -217,12 +320,19 @@ async def get_meeting(meeting_id: int, db: AsyncSession = Depends(get_db)):
 async def update_meeting(
     meeting_id: int,
     meeting_data: MeetingCreate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     result = await db.execute(select(Meeting).where(Meeting.id == meeting_id))
     meeting = result.scalar_one_or_none()
     if not meeting:
         raise HTTPException(status_code=404, detail="会议不存在")
+    
+    if meeting.organizer_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="只能修改自己组织的会议"
+        )
     
     update_data = meeting_data.model_dump(exclude={"organizer_id", "participant_ids"})
     for key, value in update_data.items():
@@ -239,11 +349,21 @@ async def update_meeting(
 
 
 @router.delete("/meetings/{meeting_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_meeting(meeting_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_meeting(
+    meeting_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     result = await db.execute(select(Meeting).where(Meeting.id == meeting_id))
     meeting = result.scalar_one_or_none()
     if not meeting:
         raise HTTPException(status_code=404, detail="会议不存在")
+    
+    if meeting.organizer_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="只能删除自己组织的会议"
+        )
     
     await db.delete(meeting)
     await db.commit()
@@ -253,12 +373,19 @@ async def delete_meeting(meeting_id: int, db: AsyncSession = Depends(get_db)):
 async def add_participant(
     meeting_id: int,
     user_id: int,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     result = await db.execute(select(Meeting).where(Meeting.id == meeting_id))
     meeting = result.scalar_one_or_none()
     if not meeting:
         raise HTTPException(status_code=404, detail="会议不存在")
+    
+    if meeting.organizer_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="只有会议组织者可以添加参与者"
+        )
     
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
@@ -287,8 +414,15 @@ async def update_participant_status(
     meeting_id: int,
     user_id: int,
     status: str,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
+    if user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="只能修改自己的参与状态"
+        )
+    
     result = await db.execute(
         select(MeetingParticipant).where(
             MeetingParticipant.meeting_id == meeting_id,

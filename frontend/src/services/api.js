@@ -2,6 +2,8 @@ import axios from 'axios';
 
 const API_BASE_URL = '/api';
 
+let authToken = null;
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -9,8 +11,37 @@ const api = axios.create({
   },
 });
 
+api.interceptors.request.use(
+  (config) => {
+    if (authToken) {
+      config.headers.Authorization = `Bearer ${authToken}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+export const setAuthToken = (token) => {
+  authToken = token;
+  if (token) {
+    localStorage.setItem('authToken', token);
+  } else {
+    localStorage.removeItem('authToken');
+  }
+};
+
+export const getAuthToken = () => {
+  if (!authToken) {
+    authToken = localStorage.getItem('authToken');
+  }
+  return authToken;
+};
+
 export const userAPI = {
   create: (userData) => api.post('/users/', userData),
+  login: (credentials) => api.post('/users/login', credentials),
   getAll: () => api.get('/users/'),
   getById: (id) => api.get(`/users/${id}`),
 };

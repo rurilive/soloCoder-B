@@ -24,6 +24,9 @@ def _preprocess_password(password: str) -> bytes:
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
+    if not hashed_password or not plain_password:
+        return False
+    
     preprocessed = _preprocess_password(plain_password)
     hashed_bytes = hashed_password.encode('utf-8')
     

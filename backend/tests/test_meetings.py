@@ -392,3 +392,124 @@ class TestMeetingParticipants:
         
         assert response.status_code == 403
         assert "只能修改自己的参与状态" in response.json()["detail"]
+    
+    def test_update_participant_nonexistent_meeting(self, client, test_user):
+        response = client.put(
+            "/api/meetings/9999/participants/1/status?status=accepted",
+            headers={"Authorization": f"Bearer {test_user['token']}"}
+        )
+        
+        assert response.status_code == 404
+        assert "参与者不存在" in response.json()["detail"]
+    
+    def test_update_participant_invalid_status(self, client, test_user, test_user2):
+        meeting_data = {
+            "title": "会议",
+            "start_time": (datetime.utcnow() + timedelta(hours=1)).isoformat(),
+            "end_time": (datetime.utcnow() + timedelta(hours=2)).isoformat(),
+            "organizer_id": test_user["id"],
+            "participant_ids": [test_user2["id"]]
+        }
+        
+        create_response = client.post(
+            "/api/meetings/",
+            json=meeting_data,
+            headers={"Authorization": f"Bearer {test_user['token']}"}
+        )
+        meeting_id = create_response.json()["id"]
+        
+        response = client.put(
+            f"/api/meetings/{meeting_id}/participants/{test_user2['id']}/status?status=invalid",
+            headers={"Authorization": f"Bearer {test_user2['token']}"}
+        )
+        
+        assert response.status_code == 400
+        assert "无效的状态值" in response.json()["detail"]
+
+
+class TestMeetingEdgeCases:
+    def test_create_meeting_with_nonexistent_organizer(self, client, test_user):
+        meeting_data = {
+            "title": "测试会议",
+            "start_time": (datetime.utcnow() + timedelta(hours=1)).isoformat(),
+            "end_time": (datetime.utcnow() + timedelta(hours=2)).isoformat(),
+            "organizer_id": 9999,
+            "participant_ids": []
+        }
+        
+        response = client.post(
+            "/api/meetings/",
+            json=meeting_data,
+            headers={"Authorization": f"Bearer {test_user['token']}"}
+        )
+        
+        assert response.status_code == 403
+    
+    def test_add_participant_to_nonexistent_meeting(self, client, test_user, test_user2):
+        response = client.post(
+            f"/api/meetings/9999/participants/{test_user2['id']}",
+            headers={"Authorization": f"Bearer {test_user['token']}"}
+        )
+        
+        assert response.status_code == 404
+        assert "会议不存在" in response.json()["detail"]
+    
+    def test_add_nonexistent_user_as_participant(self, client, test_user):
+        meeting_data = {
+            "title": "会议",
+            "start_time": (datetime.utcnow() + timedelta(hours=1)).isoformat(),
+            "end_time": (datetime.utcnow() + timedelta(hours=2)).isoformat(),
+            "organizer_id": test_user["id"],
+            "participant_ids": []
+        }
+        
+        create_response = client.post(
+            "/api/meetings/",
+            json=meeting_data,
+            headers={"Authorization": f"Bearer {test_user['token']}"}
+        )
+        meeting_id = create_response.json()["id"]
+        
+        response = client.post(
+            f"/api/meetings/{meeting_id}/participants/9999",
+            headers={"Authorization": f"Bearer {test_user['token']}"}
+        )
+        
+        assert response.status_code == 404
+        assert "用户不存在" in response.json()["detail"]
+    
+    def test_update_nonexistent_meeting(self, client, test_user):
+        update_data = {
+            "title": "尝试更新",
+            "start_time": (datetime.utcnow() + timedelta(hours=1)).isoformat(),
+            "end_time": (datetime.utcnow() + timedelta(hours=2)).isoformat(),
+            "organizer_id": test_user["id"],
+            "participant_ids": []
+        }
+        
+        response = client.put(
+            "/api/meetings/9999",
+            json=update_data,
+            headers={"Authorization": f"Bearer {test_user['token']}"}
+        )
+        
+        assert response.status_code == 404
+        assert "会议不存在" in response.json()["detail"]
+    
+    def test_delete_nonexistent_meeting(self, client, test_user):
+        response = client.delete(
+            "/api/meetings/9999",
+            headers={"Authorization": f"Bearer {test_user['token']}"}
+        )
+        
+        assert response.status_code == 404
+        assert "会议不存在" in response.json()["detail"]
+    
+    def test_get_nonexistent_meeting(self, client, test_user):
+        response = client.get(
+            "/api/meetings/9999",
+            headers={"Authorization": f"Bearer {test_user['token']}"}
+        )
+        
+        assert response.status_code == 404
+        assert "会议不存在" in response.json()["detail"]

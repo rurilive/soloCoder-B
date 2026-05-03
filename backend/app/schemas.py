@@ -1,7 +1,8 @@
+import re
 from datetime import datetime
 from typing import Optional, List
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 
 class UserBase(BaseModel):
@@ -9,8 +10,28 @@ class UserBase(BaseModel):
     email: str = Field(..., min_length=5, max_length=100)
 
 
+def validate_password_complexity(password: str) -> str:
+    has_upper = bool(re.search(r'[A-Z]', password))
+    has_lower = bool(re.search(r'[a-z]', password))
+    has_digit = bool(re.search(r'\d', password))
+    has_symbol = bool(re.search(r'[!@#$%^&*(),.?":{}|<>]', password))
+    
+    categories = sum([has_upper, has_lower, has_digit, has_symbol])
+    
+    if categories < 2:
+        raise ValueError(
+            '密码必须包含至少两类字符：大写字母、小写字母、数字、符号'
+        )
+    
+    return password
+
+
 class UserCreate(UserBase):
     password: str = Field(..., min_length=6, max_length=100)
+    
+    @validator('password')
+    def password_complexity(cls, v):
+        return validate_password_complexity(v)
 
 
 class UserLogin(BaseModel):

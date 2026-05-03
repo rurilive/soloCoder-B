@@ -1,6 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { userAPI, setAuthToken, getAuthToken } from '../services/api';
 
+const validatePasswordComplexity = (password) => {
+  const hasUpper = /[A-Z]/.test(password);
+  const hasLower = /[a-z]/.test(password);
+  const hasDigit = /\d/.test(password);
+  const hasSymbol = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+  
+  const categories = [hasUpper, hasLower, hasDigit, hasSymbol].filter(Boolean).length;
+  
+  return {
+    isValid: categories >= 2,
+    categories: { hasUpper, hasLower, hasDigit, hasSymbol },
+    categoriesCount: categories
+  };
+};
+
 const UserSelector = ({ currentUser, onUserChange, onAuthStatusChange }) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -10,13 +25,27 @@ const UserSelector = ({ currentUser, onUserChange, onAuthStatusChange }) => {
   const [loginData, setLoginData] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [passwordValidation, setPasswordValidation] = useState({
+    isValid: true,
+    categories: { hasUpper: false, hasLower: false, hasDigit: false, hasSymbol: false },
+    categoriesCount: 0
+  });
 
-
+  const handlePasswordChange = (e) => {
+    const password = e.target.value;
+    setNewUser({ ...newUser, password: password });
+    setPasswordValidation(validatePasswordComplexity(password));
+  };
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
+
+    if (newUser.password.length > 0 && !passwordValidation.isValid) {
+      setError('密码必须包含至少两类字符：大写字母、小写字母、数字、符号');
+      return;
+    }
 
     try {
       const response = await userAPI.create(newUser);
@@ -174,10 +203,54 @@ const UserSelector = ({ currentUser, onUserChange, onAuthStatusChange }) => {
                 <input
                   type="password"
                   value={newUser.password}
-                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                  onChange={handlePasswordChange}
                   required
                   minLength="6"
+                  style={{
+                    borderColor: newUser.password.length > 0 && !passwordValidation.isValid ? '#dc3545' : undefined
+                  }}
                 />
+                <div style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
+                  <p style={{ margin: '0 0 4px 0' }}>密码需要包含至少两类字符：</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    <span style={{ 
+                      color: passwordValidation.categories.hasUpper ? '#28a745' : '#6c757d',
+                      fontWeight: passwordValidation.categories.hasUpper ? 'bold' : 'normal'
+                    }}>
+                      {passwordValidation.categories.hasUpper ? '✓' : '○'} 大写字母
+                    </span>
+                    <span style={{ 
+                      color: passwordValidation.categories.hasLower ? '#28a745' : '#6c757d',
+                      fontWeight: passwordValidation.categories.hasLower ? 'bold' : 'normal'
+                    }}>
+                      {passwordValidation.categories.hasLower ? '✓' : '○'} 小写字母
+                    </span>
+                    <span style={{ 
+                      color: passwordValidation.categories.hasDigit ? '#28a745' : '#6c757d',
+                      fontWeight: passwordValidation.categories.hasDigit ? 'bold' : 'normal'
+                    }}>
+                      {passwordValidation.categories.hasDigit ? '✓' : '○'} 数字
+                    </span>
+                    <span style={{ 
+                      color: passwordValidation.categories.hasSymbol ? '#28a745' : '#6c757d',
+                      fontWeight: passwordValidation.categories.hasSymbol ? 'bold' : 'normal'
+                    }}>
+                      {passwordValidation.categories.hasSymbol ? '✓' : '○'} 符号
+                    </span>
+                  </div>
+                  {newUser.password.length > 0 && (
+                    <p style={{ 
+                      margin: '8px 0 0 0',
+                      color: passwordValidation.isValid ? '#28a745' : '#dc3545',
+                      fontWeight: 'bold'
+                    }}>
+                      {passwordValidation.isValid 
+                        ? `✓ 密码强度符合要求 (已包含 ${passwordValidation.categoriesCount} 类字符)`
+                        : `✗ 密码强度不足 (当前仅包含 ${passwordValidation.categoriesCount} 类字符，需要至少 2 类)`
+                      }
+                    </p>
+                  )}
+                </div>
               </div>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button type="submit" className="btn">注册</button>

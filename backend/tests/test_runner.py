@@ -1057,5 +1057,101 @@ class TestNoFinalResult:
         assert result["result"] is not None
 
 
+class TestEndNodeResultNone:
+    """Tests for when end node returns None."""
+
+    def test_end_node_result_none_uses_node_outputs(self):
+        """Test when end node returns None, uses node_outputs as fallback."""
+        workflow = Workflow.create(name="End Node None Test")
+        
+        start = Node.create(
+            node_type="start",
+            position=Position(x=100, y=100),
+            config=NodeConfig(params={"result": None})
+        )
+        
+        end = Node.create(
+            node_type="end",
+            position=Position(x=300, y=100)
+        )
+        
+        workflow.nodes = [start, end]
+        workflow.edges = [
+            Edge.create(source=start.id, target=end.id),
+        ]
+        
+        runner = WorkflowRunner(workflow)
+        result = runner.run()
+        
+        assert result["status"] == "success"
+
+
+class TestUserCodeStringConcat:
+    """Tests for user code with string concatenation edge cases."""
+
+    def test_user_code_string_concat_with_int_error(self):
+        """Test that user code error with string + int is properly reported."""
+        workflow = Workflow.create(name="String Concat Test")
+        
+        start = Node.create(
+            node_type="start",
+            position=Position(x=100, y=100),
+            config=NodeConfig(params={"name": "Alice", "age": 25})
+        )
+        
+        code = Node.create(
+            node_type="python_code",
+            position=Position(x=300, y=100),
+            config=NodeConfig(code='greeting = "Hello " + name + ", age: " + age')
+        )
+        
+        workflow.nodes = [start, code]
+        workflow.edges = [
+            Edge.create(source=start.id, target=code.id),
+        ]
+        
+        runner = WorkflowRunner(workflow)
+        result = runner.run()
+        
+        assert result["status"] == "error"
+        assert "concatenate" in result["error"].lower() or "str" in result["error"].lower()
+
+
+class TestNestedValueGetattr:
+    """Tests for _get_nested_value with getattr access."""
+
+    def test_getattr_on_custom_object(self):
+        """Test accessing attributes on custom objects."""
+        workflow = Workflow.create(name="Getattr Test")
+        
+        class CustomObj:
+            def __init__(self):
+                self.value = 42
+        
+        runner = WorkflowRunner(workflow)
+        runner.node_outputs = {
+            "node": {"obj": CustomObj()}
+        }
+        
+        result = runner._get_nested_value("node.obj.value")
+        assert result == 42
+
+    def test_getattr_missing_attribute_returns_none(self):
+        """Test that missing attribute returns None."""
+        workflow = Workflow.create(name="Getattr Missing Test")
+        
+        class CustomObj:
+            def __init__(self):
+                self.value = 42
+        
+        runner = WorkflowRunner(workflow)
+        runner.node_outputs = {
+            "node": {"obj": CustomObj()}
+        }
+        
+        result = runner._get_nested_value("node.obj.non_existent")
+        assert result is None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

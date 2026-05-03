@@ -1,0 +1,118 @@
+==========================================
+  Python 后端
+==========================================
+
+# 虚拟环境
+.venv/
+venv/
+ENV/
+
+# Python 字节码
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 分发
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# 测试
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.coverage
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# 日志
+*.log
+
+# 本地配置
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 操作系统
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+==========================================
+  React 前端
+==========================================
+
+# 构建
+frontend/build/
+frontend/dist/
+
+# 依赖
+frontend/node_modules/
+
+# 日志
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# 测试
+frontend/coverage/
+
+# 本地环境变量
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+==========================================
+  项目特定
+==========================================
+
+# 数据库文件
+*.db
+*.sqlite
+*.sqlite3
+
+# PID 文件
+.pids/
+
+# uv 缓存
+.uv/

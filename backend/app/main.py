@@ -1,5 +1,3 @@
-import sys
-from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI

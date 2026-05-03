@@ -780,18 +780,69 @@ body {
 
 .log-level-debug {
     color: #60a5fa;
+    background-color: rgba(96, 165, 250, 0.1);
+    padding: 2px 4px;
+    border-radius: 3px;
 }
 
 .log-level-info {
     color: #34d399;
+    background-color: rgba(52, 211, 153, 0.1);
+    padding: 2px 4px;
+    border-radius: 3px;
 }
 
 .log-level-warning {
     color: #fbbf24;
+    background-color: rgba(251, 191, 36, 0.1);
+    padding: 2px 4px;
+    border-radius: 3px;
 }
 
 .log-level-error {
     color: #f87171;
+    background-color: rgba(248, 113, 113, 0.1);
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-weight: bold;
+}
+
+.log-entry {
+    display: block;
+    margin-bottom: 4px;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(75, 85, 99, 0.3);
+}
+
+.log-entry:last-child {
+    border-bottom: none;
+}
+
+.log-timestamp {
+    color: var(--text-muted);
+    font-size: 11px;
+    margin-right: 8px;
+}
+
+.log-message {
+    margin-left: 8px;
+}
+
+.output-text span {
+    display: inline;
+}
+
+.output-text .log-level-debug,
+.output-text .log-level-info,
+.output-text .log-level-warning,
+.output-text .log-level-error {
+    display: inline-block;
+    margin-right: 8px;
+    font-family: 'Fira Code', 'Consolas', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    min-width: 50px;
+    text-align: center;
 }
 
 .output-title {

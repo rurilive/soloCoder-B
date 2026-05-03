@@ -378,10 +378,12 @@ class App {
     }
 
     clearOutput() {
-        document.querySelector('#output-logs .output-text').textContent = '';
+        const logOutput = document.querySelector('#output-logs .output-text');
+        logOutput.innerHTML = '';
         document.querySelector('#output-result .output-text').textContent = '';
         document.querySelector('#output-error .output-text').textContent = '';
         this.allLogs = [];
+        console.log('[App] Output cleared, allLogs is now empty');
     }
 
     appendLog(logEntry) {
@@ -393,23 +395,34 @@ class App {
             };
         }
         
+        console.log('[App] Appending log:', logEntry);
+        
         this.allLogs.push(logEntry);
         
         if (this.shouldShowLog(logEntry.level)) {
-            this.displayLogEntry(logEntry);
+            this.displayLogEntry(logEntry, true);
         }
     }
 
     shouldShowLog(logLevel) {
-        return this.logLevelValues[logLevel] >= this.logLevelValues[this.currentLogLevel];
+        const levelValue = this.logLevelValues[logLevel];
+        const currentLevelValue = this.logLevelValues[this.currentLogLevel];
+        const shouldShow = levelValue >= currentLevelValue;
+        
+        console.log(`[App] shouldShowLog: level=${logLevel}(${levelValue}), current=${this.currentLogLevel}(${currentLevelValue}), shouldShow=${shouldShow}`);
+        
+        return shouldShow;
     }
 
-    displayLogEntry(logEntry) {
+    displayLogEntry(logEntry, switchTab = false) {
         const logOutput = document.querySelector('#output-logs .output-text');
         const formattedLog = this.formatLogEntry(logEntry);
         logOutput.innerHTML += formattedLog;
         logOutput.scrollTop = logOutput.scrollHeight;
-        this.switchOutputTab('logs');
+        
+        if (switchTab) {
+            this.switchOutputTab('logs');
+        }
     }
 
     formatLogEntry(logEntry) {
@@ -417,21 +430,46 @@ class App {
         const message = logEntry.message || '';
         const timestamp = logEntry.timestamp || '';
         
-        const timeStr = timestamp ? new Date(timestamp).toLocaleTimeString() : '';
-        const levelClass = `log-level-${level.toLowerCase()}`;
+        const timeStr = timestamp ? new Date(timestamp).toLocaleTimeString('zh-CN', { 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            second: '2-digit',
+            hour12: false 
+        }) : '';
         
-        return `<span class="${levelClass}">[${level}] ${timeStr} ${message}</span>\n`;
+        const levelClass = `log-level-${level.toLowerCase()}`;
+        const paddedLevel = level.padEnd(7, ' ');
+        
+        return `<div class="log-entry">
+            <span class="${levelClass}">${paddedLevel}</span>
+            <span class="log-timestamp">${timeStr}</span>
+            <span class="log-message">${this.escapeHtml(message)}</span>
+        </div>`;
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     filterLogsByLevel() {
+        console.log(`[App] filterLogsByLevel called with currentLogLevel: ${this.currentLogLevel}`);
+        console.log(`[App] allLogs length: ${this.allLogs.length}`);
+        console.log(`[App] allLogs:`, this.allLogs);
+        
         const logOutput = document.querySelector('#output-logs .output-text');
         logOutput.innerHTML = '';
         
+        let displayedCount = 0;
         this.allLogs.forEach(logEntry => {
             if (this.shouldShowLog(logEntry.level)) {
-                this.displayLogEntry(logEntry);
+                this.displayLogEntry(logEntry, false);
+                displayedCount++;
             }
         });
+        
+        console.log(`[App] Displayed ${displayedCount} logs out of ${this.allLogs.length}`);
     }
 
     setOutputResult(data) {

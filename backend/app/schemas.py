@@ -9,9 +9,9 @@ class UserBase(BaseModel):
     username: str = Field(..., min_length=2, max_length=50)
     email: Optional[str] = Field(None, min_length=5, max_length=100)
     
-    @validator('email')
+    @validator('email', pre=True)
     def empty_email_to_none(cls, v):
-        if v is None or v.strip() == '':
+        if v is None or v == '' or (isinstance(v, str) and v.strip() == ''):
             return None
         return v
 

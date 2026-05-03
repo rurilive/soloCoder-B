@@ -1,9 +1,9 @@
+import bcrypt
 import hashlib
 from datetime import datetime, timedelta
 from typing import Optional
 
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,31 +16,38 @@ SECRET_KEY = "your-secret-key-keep-it-safe-in-production"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
 
 
-def _preprocess_password(password: str) -> str:
-    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+def _preprocess_password(password: str) -> bytes:
+    return hashlib.sha256(password.encode('utf-8')).hexdigest().encode('utf-8')
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     preprocessed = _preprocess_password(plain_password)
+    hashed_bytes = hashed_password.encode('utf-8')
+    
     try:
-        if pwd_context.verify(preprocessed, hashed_password):
+        if bcrypt.checkpw(preprocessed, hashed_bytes):
             return True
     except Exception:
         pass
     
     try:
-        return pwd_context.verify(plain_password, hashed_password)
+        plain_bytes = plain_password.encode('utf-8')
+        if bcrypt.checkpw(plain_bytes, hashed_bytes):
+            return True
     except Exception:
-        return False
+        pass
+    
+    return False
 
 
 def get_password_hash(password: str) -> str:
     preprocessed = _preprocess_password(password)
-    return pwd_context.hash(preprocessed)
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(preprocessed, salt)
+    return hashed.decode('utf-8')
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:

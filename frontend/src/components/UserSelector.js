@@ -11,24 +11,7 @@ const UserSelector = ({ currentUser, onUserChange, onAuthStatusChange }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  useEffect(() => {
-    const token = getAuthToken();
-    if (token) {
-      fetchUsers();
-    }
-  }, []);
 
-  const fetchUsers = async () => {
-    setLoading(true);
-    try {
-      const response = await userAPI.getAll();
-      setUsers(response.data);
-    } catch (err) {
-      setError('获取用户列表失败');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleCreateUser = async (e) => {
     e.preventDefault();

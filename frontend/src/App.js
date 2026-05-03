@@ -14,22 +14,9 @@ function App() {
   useEffect(() => {
     const token = getAuthToken();
     if (token) {
-      checkAuthStatus();
+      setIsAuthenticated(true);
     }
   }, []);
-
-  const checkAuthStatus = async () => {
-    setLoading(true);
-    try {
-      const response = await userAPI.getAll();
-      setIsAuthenticated(true);
-    } catch (err) {
-      setIsAuthenticated(false);
-      setError('会话已过期，请重新登录');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleAuthStatusChange = (status) => {
     setIsAuthenticated(status);

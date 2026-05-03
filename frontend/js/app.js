@@ -429,6 +429,9 @@ class App {
         const level = logEntry.level || 'INFO';
         const message = logEntry.message || '';
         const timestamp = logEntry.timestamp || '';
+        const nodeName = logEntry.node_name;
+        const nodeId = logEntry.node_id;
+        const nodeType = logEntry.node_type;
         
         const timeStr = timestamp ? new Date(timestamp).toLocaleTimeString('zh-CN', { 
             hour: '2-digit', 
@@ -440,10 +443,23 @@ class App {
         const levelClass = `log-level-${level.toLowerCase()}`;
         const paddedLevel = level.padEnd(7, ' ');
         
+        let displayMessage = message;
+        let nodeLabel = '';
+        
+        if (nodeName) {
+            nodeLabel = `【${nodeName}】`;
+        } else if (nodeId) {
+            nodeLabel = `【${nodeId}】`;
+        }
+        
+        if (nodeLabel) {
+            displayMessage = `${nodeLabel}: ${message}`;
+        }
+        
         return `<div class="log-entry">
             <span class="${levelClass}">${paddedLevel}</span>
             <span class="log-timestamp">${timeStr}</span>
-            <span class="log-message">${this.escapeHtml(message)}</span>
+            <span class="log-message">${this.escapeHtml(displayMessage)}</span>
         </div>`;
     }
 

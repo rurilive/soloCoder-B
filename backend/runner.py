@@ -133,32 +133,36 @@ class WorkflowRunner:
 
     def _execute_node(self, node_model: Node) -> None:
         node = NodeRegistry.create_node(node_model)
+        node_id = node_model.id
+        node_type = node_model.type
+        node_name = node_model.label or self._get_default_node_name(node_type)
+        
         if node is None:
-            self.log(f"========== 警告 ==========", LogLevel.WARNING)
-            self.log(f"未知节点类型: '{node_model.type}', 节点ID: {node_model.id}", LogLevel.WARNING)
-            self.log(f"该节点将被跳过，继续执行后续节点", LogLevel.WARNING)
+            self.log(f"========== 警告 ==========", LogLevel.WARNING, node_id, node_name, node_type)
+            self.log(f"未知节点类型: '{node_model.type}', 节点ID: {node_model.id}", LogLevel.WARNING, node_id, node_name, node_type)
+            self.log(f"该节点将被跳过，继续执行后续节点", LogLevel.WARNING, node_id, node_name, node_type)
             return
         
-        self.log(f"---------- 执行节点 ----------", LogLevel.INFO)
-        self.log(f"节点ID: {node_model.id}", LogLevel.INFO)
-        self.log(f"节点类型: {node_model.type}", LogLevel.INFO)
-        self.log(f"节点位置: ({node_model.position.x}, {node_model.position.y})", LogLevel.DEBUG)
+        self.log(f"---------- 执行节点 ----------", LogLevel.INFO, node_id, node_name, node_type)
+        self.log(f"节点ID: {node_model.id}", LogLevel.INFO, node_id, node_name, node_type)
+        self.log(f"节点类型: {node_model.type}", LogLevel.INFO, node_id, node_name, node_type)
+        self.log(f"节点位置: ({node_model.position.x}, {node_model.position.y})", LogLevel.DEBUG, node_id, node_name, node_type)
         
         inputs = self._resolve_inputs(node_model)
-        self.log(f"节点输入参数:", LogLevel.DEBUG)
+        self.log(f"节点输入参数:", LogLevel.DEBUG, node_id, node_name, node_type)
         if inputs:
             for key, value in inputs.items():
                 value_str = str(value)
                 if len(value_str) > 100:
                     value_str = value_str[:100] + "..."
-                self.log(f"  {key}: {value_str}", LogLevel.DEBUG)
+                self.log(f"  {key}: {value_str}", LogLevel.DEBUG, node_id, node_name, node_type)
         else:
-            self.log(f"  (无输入参数)", LogLevel.DEBUG)
+            self.log(f"  (无输入参数)", LogLevel.DEBUG, node_id, node_name, node_type)
         
         try:
             from .nodes import PythonCodeNode
             
-            self.log(f"开始执行节点逻辑...", LogLevel.DEBUG)
+            self.log(f"开始执行节点逻辑...", LogLevel.DEBUG, node_id, node_name, node_type)
             
             if isinstance(node, PythonCodeNode) and self.sandbox and hasattr(self.sandbox, 'execute'):
                 output = self.sandbox.execute(node, inputs, self.context)
@@ -167,41 +171,41 @@ class WorkflowRunner:
             
             self.node_outputs[node_model.id] = output
             
-            self.log(f"节点执行成功!", LogLevel.INFO)
-            self.log(f"节点输出:", LogLevel.DEBUG)
+            self.log(f"节点执行成功!", LogLevel.INFO, node_id, node_name, node_type)
+            self.log(f"节点输出:", LogLevel.DEBUG, node_id, node_name, node_type)
             output_str = str(output)
             if len(output_str) > 100:
                 output_str = output_str[:100] + "..."
-            self.log(f"  {output_str}", LogLevel.DEBUG)
+            self.log(f"  {output_str}", LogLevel.DEBUG, node_id, node_name, node_type)
             
         except Exception as e:
             import traceback
             
-            self.log(f"========== 节点执行错误 ==========", LogLevel.ERROR)
-            self.log(f"节点ID: {node_model.id}", LogLevel.ERROR)
-            self.log(f"节点类型: {node_model.type}", LogLevel.ERROR)
-            self.log(f"错误类型: {type(e).__name__}", LogLevel.ERROR)
-            self.log(f"错误信息: {str(e)}", LogLevel.ERROR)
-            self.log(f"节点执行上下文:", LogLevel.ERROR)
-            self.log(f"  输入参数: {inputs}", LogLevel.ERROR)
-            self.log(f"  已执行节点: {list(self.node_outputs.keys())}", LogLevel.ERROR)
+            self.log(f"========== 节点执行错误 ==========", LogLevel.ERROR, node_id, node_name, node_type)
+            self.log(f"节点ID: {node_model.id}", LogLevel.ERROR, node_id, node_name, node_type)
+            self.log(f"节点类型: {node_model.type}", LogLevel.ERROR, node_id, node_name, node_type)
+            self.log(f"错误类型: {type(e).__name__}", LogLevel.ERROR, node_id, node_name, node_type)
+            self.log(f"错误信息: {str(e)}", LogLevel.ERROR, node_id, node_name, node_type)
+            self.log(f"节点执行上下文:", LogLevel.ERROR, node_id, node_name, node_type)
+            self.log(f"  输入参数: {inputs}", LogLevel.ERROR, node_id, node_name, node_type)
+            self.log(f"  已执行节点: {list(self.node_outputs.keys())}", LogLevel.ERROR, node_id, node_name, node_type)
             
             if isinstance(node, PythonCodeNode):
-                self.log(f"Python代码节点详情:", LogLevel.ERROR)
+                self.log(f"Python代码节点详情:", LogLevel.ERROR, node_id, node_name, node_type)
                 code_lines = node.config.code.split('\n') if hasattr(node.config, 'code') else []
-                self.log(f"  代码行数: {len(code_lines)}", LogLevel.ERROR)
+                self.log(f"  代码行数: {len(code_lines)}", LogLevel.ERROR, node_id, node_name, node_type)
                 if code_lines:
-                    self.log(f"  代码预览:", LogLevel.ERROR)
+                    self.log(f"  代码预览:", LogLevel.ERROR, node_id, node_name, node_type)
                     for i, line in enumerate(code_lines[:10]):
-                        self.log(f"    第{i+1}行: {line}", LogLevel.ERROR)
+                        self.log(f"    第{i+1}行: {line}", LogLevel.ERROR, node_id, node_name, node_type)
                     if len(code_lines) > 10:
-                        self.log(f"    ... (共{len(code_lines)}行)", LogLevel.ERROR)
+                        self.log(f"    ... (共{len(code_lines)}行)", LogLevel.ERROR, node_id, node_name, node_type)
             
-            self.log(f"详细错误堆栈:", LogLevel.ERROR)
+            self.log(f"详细错误堆栈:", LogLevel.ERROR, node_id, node_name, node_type)
             stack_trace = traceback.format_exc()
             for line in stack_trace.split('\n'):
                 if line.strip():
-                    self.log(f"  {line}", LogLevel.ERROR)
+                    self.log(f"  {line}", LogLevel.ERROR, node_id, node_name, node_type)
             
             raise
 
@@ -334,14 +338,31 @@ class WorkflowRunner:
         
         return current
 
-    def log(self, message: str, level: LogLevel = LogLevel.INFO) -> None:
+    def log(self, message: str, level: LogLevel = LogLevel.INFO, node_id: str = None, node_name: str = None, node_type: str = None) -> None:
         log_entry = {
             "level": level.name,
             "message": message,
-            "timestamp": self._get_timestamp()
+            "timestamp": self._get_timestamp(),
+            "node_id": node_id,
+            "node_name": node_name,
+            "node_type": node_type
         }
         self.logs.append(log_entry)
-        print(f"[Runner] [{level.name}] {message}")
+        if node_name:
+            print(f"[Runner] [{level.name}] 【{node_name}】: {message}")
+        elif node_id:
+            print(f"[Runner] [{level.name}] 【{node_id}】: {message}")
+        else:
+            print(f"[Runner] [{level.name}] {message}")
+    
+    def _get_default_node_name(self, node_type: str) -> str:
+        type_names = {
+            "start": "开始节点",
+            "end": "结束节点",
+            "python_code": "Python代码节点",
+            "condition": "条件判断节点"
+        }
+        return type_names.get(node_type, f"{node_type}节点")
     
     def _get_timestamp(self) -> str:
         from datetime import datetime

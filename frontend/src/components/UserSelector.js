@@ -49,10 +49,24 @@ const UserSelector = ({ currentUser, onUserChange, onAuthStatusChange }) => {
 
     try {
       const response = await userAPI.create(newUser);
-      setUsers([...users, response.data]);
+      const { access_token } = response.data;
+      setAuthToken(access_token);
+      
+      const usersResponse = await userAPI.getAll();
+      setUsers(usersResponse.data);
+      
+      const currentUserData = usersResponse.data.find(
+        u => u.username === newUser.username
+      );
+      
+      if (currentUserData) {
+        onUserChange(currentUserData);
+        onAuthStatusChange(true);
+      }
+      
       setNewUser({ username: '', email: '', password: '' });
       setShowCreateForm(false);
-      setSuccess('用户创建成功！请使用新账号登录');
+      setSuccess('注册并登录成功！');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError(err.response?.data?.detail || '创建用户失败');
@@ -190,12 +204,12 @@ const UserSelector = ({ currentUser, onUserChange, onAuthStatusChange }) => {
                 />
               </div>
               <div className="form-group">
-                <label>邮箱:</label>
+                <label>邮箱 (可选):</label>
                 <input
                   type="email"
                   value={newUser.email}
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                  required
+                  placeholder="可选"
                 />
               </div>
               <div className="form-group">

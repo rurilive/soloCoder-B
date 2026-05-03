@@ -20,16 +20,16 @@ from app.auth import (
 router = APIRouter()
 
 
-@router.post("/users/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/users/", response_model=Token, status_code=status.HTTP_201_CREATED)
 async def create_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
-        select(User).where((User.username == user.username) | (User.email == user.email))
+        select(User).where(User.username == user.username)
     )
     existing_user = result.scalar_one_or_none()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="用户名或邮箱已存在"
+            detail="用户名已存在"
         )
     
     hashed_password = get_password_hash(user.password)
@@ -41,7 +41,9 @@ async def create_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
     db.add(new_user)
     await db.commit()
     await db.refresh(new_user)
-    return new_user
+    
+    access_token = create_access_token(data={"sub": new_user.id})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 @router.post("/users/login", response_model=Token)

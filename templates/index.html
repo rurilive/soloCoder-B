@@ -24,11 +24,73 @@
             margin: 0 auto;
         }
 
-        h1 {
-            text-align: center;
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #3c3c3c;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-details {
+            text-align: right;
+        }
+
+        .username {
             color: #4ec9b0;
-            margin-bottom: 30px;
-            font-size: 2.5em;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .usage-info {
+            font-size: 0.85em;
+            color: #858585;
+        }
+
+        .usage-info span {
+            color: #4ec9b0;
+        }
+
+        .admin-link {
+            color: #d4a940;
+            text-decoration: none;
+            padding: 5px 10px;
+            border: 1px solid #d4a940;
+            border-radius: 4px;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+
+        .admin-link:hover {
+            background-color: #d4a940;
+            color: #1e1e1e;
+        }
+
+        .logout-btn {
+            background-color: #c74f4f;
+            color: #d4d4d4;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            transition: all 0.3s ease;
+        }
+
+        .logout-btn:hover {
+            background-color: #d85f5f;
+        }
+
+        h1 {
+            color: #4ec9b0;
+            font-size: 2em;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
         }
 
@@ -250,7 +312,17 @@
 </head>
 <body>
     <div class="container">
-        <h1>图片转字符画工具</h1>
+        <div class="header">
+            <h1>图片转字符画工具</h1>
+            <div class="user-info">
+                <div class="user-details" id="userDetails">
+                    <div class="username" id="usernameDisplay"></div>
+                    <div class="usage-info" id="usageDisplay"></div>
+                </div>
+                <a href="/admin" class="admin-link" id="adminLink" style="display: none;">用户管理</a>
+                <button class="logout-btn" id="logoutBtn">退出登录</button>
+            </div>
+        </div>
         
         <div class="upload-section">
             <div class="upload-area" id="uploadArea">
@@ -306,9 +378,41 @@
         const invertCheckbox = document.getElementById('invert');
         const copyBtn = document.getElementById('copyBtn');
         const downloadBtn = document.getElementById('downloadBtn');
+        const usernameDisplay = document.getElementById('usernameDisplay');
+        const usageDisplay = document.getElementById('usageDisplay');
+        const adminLink = document.getElementById('adminLink');
+        const logoutBtn = document.getElementById('logoutBtn');
 
         let selectedFile = null;
         let currentAsciiArt = '';
+
+        async function loadUserInfo() {
+            try {
+                const response = await fetch('/api/user/info', {
+                    credentials: 'same-origin'
+                });
+                if (response.ok) {
+                    const user = await response.json();
+                    usernameDisplay.textContent = '欢迎, ' + user.username;
+                    if (user.usage_limit === -1) {
+                        usageDisplay.innerHTML = '使用次数: <span>' + user.usage_count + '</span> / <span>无限</span>';
+                    } else {
+                        usageDisplay.innerHTML = '使用次数: <span>' + user.usage_count + '</span> / <span>' + user.usage_limit + '</span>';
+                    }
+                    if (user.is_admin) {
+                        adminLink.style.display = 'inline-block';
+                    }
+                } else if (response.status === 401) {
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                console.error('获取用户信息失败:', error);
+            }
+        }
+
+        logoutBtn.addEventListener('click', () => {
+            window.location.href = '/logout';
+        });
 
         uploadArea.addEventListener('click', () => {
             fileInput.click();
@@ -369,6 +473,7 @@
 
                 const response = await fetch('/convert', {
                     method: 'POST',
+                    credentials: 'same-origin',
                     body: formData
                 });
 
@@ -378,7 +483,19 @@
                     currentAsciiArt = result.ascii_art;
                     asciiOutput.textContent = currentAsciiArt;
                     resultSection.style.display = 'block';
+                    
+                    if (result.usage_count !== undefined && result.usage_limit !== undefined) {
+                        if (result.usage_limit === -1) {
+                            usageDisplay.innerHTML = '使用次数: <span>' + result.usage_count + '</span> / <span>无限</span>';
+                        } else {
+                            usageDisplay.innerHTML = '使用次数: <span>' + result.usage_count + '</span> / <span>' + result.usage_limit + '</span>';
+                        }
+                    }
                 } else {
+                    if (response.status === 401) {
+                        window.location.href = '/';
+                        return;
+                    }
                     showError(result.error || '转换失败');
                 }
             } catch (error) {
@@ -422,6 +539,8 @@
         function hideError() {
             errorMessage.style.display = 'none';
         }
+
+        loadUserInfo();
     </script>
 </body>
 </html>

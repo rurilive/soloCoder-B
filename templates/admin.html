@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户管理 - 图片转字符画工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #3c3c3c;
+        }
+
+        h1 {
+            color: #4ec9b0;
+            font-size: 2em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .back-link {
+            color: #d4a940;
+            text-decoration: none;
+            padding: 8px 16px;
+            border: 1px solid #d4a940;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .back-link:hover {
+            background-color: #d4a940;
+            color: #1e1e1e;
+        }
+
+        .logout-btn {
+            background-color: #c74f4f;
+            color: #d4d4d4;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            transition: all 0.3s ease;
+        }
+
+        .logout-btn:hover {
+            background-color: #d85f5f;
+        }
+
+        .add-section {
+            background-color: #252526;
+            border: 1px solid #3c3c3c;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+
+        .add-section h2 {
+            color: #4ec9b0;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+        }
+
+        .form-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: end;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            color: #858585;
+        }
+
+        .form-group input[type="text"],
+        .form-group input[type="password"],
+        .form-group input[type="number"] {
+            background-color: #3c3c3c;
+            border: 1px solid #4c4c4c;
+            color: #d4d4d4;
+            padding: 10px 12px;
+            border-radius: 4px;
+            font-size: 1em;
+            font-family: 'Courier New', monospace;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #4ec9b0;
+        }
+
+        .form-group.checkbox-group {
+            flex-direction: row;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .add-btn {
+            background-color: #4ec9b0;
+            color: #1e1e1e;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 4px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Courier New', monospace;
+        }
+
+        .add-btn:hover {
+            background-color: #5edcc1;
+            transform: translateY(-2px);
+        }
+
+        .users-section {
+            background-color: #252526;
+            border: 1px solid #3c3c3c;
+            border-radius: 8px;
+            padding: 25px;
+        }
+
+        .users-section h2 {
+            color: #4ec9b0;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+        }
+
+        .users-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .users-table th,
+        .users-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #3c3c3c;
+        }
+
+        .users-table th {
+            background-color: #2d2d2d;
+            color: #4ec9b0;
+            font-weight: bold;
+        }
+
+        .users-table tr:hover {
+            background-color: #2d2d2d;
+        }
+
+        .admin-badge {
+            background-color: #d4a940;
+            color: #1e1e1e;
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+
+        .user-badge {
+            background-color: #3c3c3c;
+            color: #858585;
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-size: 0.85em;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .edit-btn, .delete-btn {
+            padding: 5px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            transition: all 0.3s ease;
+            font-size: 0.9em;
+        }
+
+        .edit-btn {
+            background-color: #3c3c3c;
+            color: #4ec9b0;
+        }
+
+        .edit-btn:hover {
+            background-color: #4ec9b0;
+            color: #1e1e1e;
+        }
+
+        .delete-btn {
+            background-color: #4c2020;
+            color: #f48771;
+        }
+
+        .delete-btn:hover {
+            background-color: #c74f4f;
+            color: #d4d4d4;
+        }
+
+        .error-message {
+            background-color: #4c2020;
+            border: 1px solid #f48771;
+            color: #f48771;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .success-message {
+            background-color: #204c20;
+            border: 1px solid #87f471;
+            color: #87f471;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+
+        .modal-content {
+            background-color: #252526;
+            border: 1px solid #3c3c3c;
+            border-radius: 8px;
+            padding: 25px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            max-width: 500px;
+        }
+
+        .modal-content h2 {
+            color: #4ec9b0;
+            margin-bottom: 20px;
+        }
+
+        .modal-content .form-group {
+            margin-bottom: 15px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .modal-actions button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+
+        .save-btn {
+            background-color: #4ec9b0;
+            color: #1e1e1e;
+            font-weight: bold;
+        }
+
+        .save-btn:hover {
+            background-color: #5edcc1;
+        }
+
+        .cancel-btn {
+            background-color: #3c3c3c;
+            color: #d4d4d4;
+        }
+
+        .cancel-btn:hover {
+            background-color: #4c4c4c;
+        }
+
+        .empty-message {
+            text-align: center;
+            padding: 40px;
+            color: #858585;
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .form-group {
+                width: 100%;
+            }
+
+            .users-table {
+                font-size: 0.85em;
+            }
+
+            .users-table th,
+            .users-table td {
+                padding: 8px 10px;
+            }
+
+            .actions {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>用户管理</h1>
+            <div class="header-actions">
+                <a href="/" class="back-link">返回工具</a>
+                <button class="logout-btn" id="logoutBtn">退出登录</button>
+            </div>
+        </div>
+
+        <div class="add-section">
+            <h2>添加新用户</h2>
+            <form id="addUserForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="newUsername">用户名</label>
+                        <input type="text" id="newUsername" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="newPassword">密码</label>
+                        <input type="password" id="newPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="newUsageLimit">使用次数上限 (-1 表示无限)</label>
+                        <input type="number" id="newUsageLimit" value="10" min="-1">
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="newIsAdmin">
+                        <label for="newIsAdmin">管理员权限</label>
+                    </div>
+                    <button type="submit" class="add-btn">添加用户</button>
+                </div>
+            </form>
+            <div class="error-message" id="addError"></div>
+            <div class="success-message" id="addSuccess"></div>
+        </div>
+
+        <div class="users-section">
+            <h2>用户列表</h2>
+            <div id="usersContainer">
+                <table class="users-table" id="usersTable">
+                    <thead>
+                        <tr>
+                            <th>用户名</th>
+                            <th>角色</th>
+                            <th>已使用次数</th>
+                            <th>使用上限</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                    </tbody>
+                </table>
+                <div class="empty-message" id="emptyMessage" style="display: none;">暂无用户</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <h2>编辑用户</h2>
+            <form id="editUserForm">
+                <div class="form-group">
+                    <label for="editUsername">用户名</label>
+                    <input type="text" id="editUsername" readonly>
+                </div>
+                <div class="form-group">
+                    <label for="editPassword">新密码 (留空表示不修改)</label>
+                    <input type="password" id="editPassword">
+                </div>
+                <div class="form-group">
+                    <label for="editUsageLimit">使用次数上限 (-1 表示无限)</label>
+                    <input type="number" id="editUsageLimit" min="-1">
+                </div>
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="editIsAdmin">
+                    <label for="editIsAdmin">管理员权限</label>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="cancel-btn" id="cancelEdit">取消</button>
+                    <button type="submit" class="save-btn">保存修改</button>
+                </div>
+                <div class="error-message" id="editError"></div>
+                <div class="success-message" id="editSuccess"></div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const addUserForm = document.getElementById('addUserForm');
+        const addError = document.getElementById('addError');
+        const addSuccess = document.getElementById('addSuccess');
+        const usersTableBody = document.getElementById('usersTableBody');
+        const emptyMessage = document.getElementById('emptyMessage');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const editModal = document.getElementById('editModal');
+        const editUserForm = document.getElementById('editUserForm');
+        const cancelEdit = document.getElementById('cancelEdit');
+        const editError = document.getElementById('editError');
+        const editSuccess = document.getElementById('editSuccess');
+
+        let editingUser = null;
+
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/users', {
+                    credentials: 'same-origin'
+                });
+                if (response.ok) {
+                    const result = await response.json();
+                    renderUsers(result.users);
+                } else if (response.status === 401) {
+                    window.location.href = '/';
+                } else {
+                    showError(addError, '加载用户列表失败');
+                }
+            } catch (error) {
+                showError(addError, '网络错误: ' + error.message);
+            }
+        }
+
+        function renderUsers(users) {
+            usersTableBody.innerHTML = '';
+            
+            if (users.length === 0) {
+                emptyMessage.style.display = 'block';
+                return;
+            }
+
+            emptyMessage.style.display = 'none';
+
+            users.forEach(user => {
+                const row = document.createElement('tr');
+                
+                const roleBadge = user.is_admin 
+                    ? '<span class="admin-badge">管理员</span>' 
+                    : '<span class="user-badge">普通用户</span>';
+                
+                const usageLimitText = user.usage_limit === -1 ? '无限' : user.usage_limit;
+
+                row.innerHTML = `
+                    <td>${user.username}</td>
+                    <td>${roleBadge}</td>
+                    <td>${user.usage_count}</td>
+                    <td>${usageLimitText}</td>
+                    <td>
+                        <div class="actions">
+                            <button class="edit-btn" data-username="${user.username}">编辑</button>
+                            ${user.username !== 'admin' ? `<button class="delete-btn" data-username="${user.username}">删除</button>` : ''}
+                        </div>
+                    </td>
+                `;
+                usersTableBody.appendChild(row);
+            });
+
+            document.querySelectorAll('.edit-btn').forEach(btn => {
+                btn.addEventListener('click', () => openEditModal(btn.dataset.username));
+            });
+
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', () => deleteUser(btn.dataset.username));
+            });
+        }
+
+        addUserForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('newUsername').value.trim();
+            const password = document.getElementById('newPassword').value;
+            const usageLimit = parseInt(document.getElementById('newUsageLimit').value);
+            const isAdmin = document.getElementById('newIsAdmin').checked;
+
+            if (!username || !password) {
+                showError(addError, '用户名和密码不能为空');
+                return;
+            }
+
+            try {
+                hideError(addError);
+                hideSuccess(addSuccess);
+
+                const response = await fetch('/api/users', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password,
+                        usage_limit: usageLimit,
+                        is_admin: isAdmin
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showSuccess(addSuccess, '用户添加成功');
+                    addUserForm.reset();
+                    document.getElementById('newUsageLimit').value = '10';
+                    loadUsers();
+                } else {
+                    showError(addError, result.error || '添加用户失败');
+                }
+            } catch (error) {
+                showError(addError, '网络错误: ' + error.message);
+            }
+        });
+
+        async function openEditModal(username) {
+            try {
+                const response = await fetch('/api/users', {
+                    credentials: 'same-origin'
+                });
+                if (response.ok) {
+                    const result = await response.json();
+                    const user = result.users.find(u => u.username === username);
+                    
+                    if (user) {
+                        editingUser = user;
+                        document.getElementById('editUsername').value = user.username;
+                        document.getElementById('editPassword').value = '';
+                        document.getElementById('editUsageLimit').value = user.usage_limit;
+                        document.getElementById('editIsAdmin').checked = user.is_admin;
+                        
+                        hideError(editError);
+                        hideSuccess(editSuccess);
+                        editModal.style.display = 'block';
+                    }
+                }
+            } catch (error) {
+                showError(addError, '加载用户信息失败: ' + error.message);
+            }
+        }
+
+        function closeEditModal() {
+            editModal.style.display = 'none';
+            editingUser = null;
+        }
+
+        cancelEdit.addEventListener('click', closeEditModal);
+
+        editUserForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (!editingUser) return;
+
+            const password = document.getElementById('editPassword').value || null;
+            const usageLimit = parseInt(document.getElementById('editUsageLimit').value);
+            const isAdmin = document.getElementById('editIsAdmin').checked;
+
+            const data = {
+                usage_limit: usageLimit,
+                is_admin: isAdmin
+            };
+            if (password) {
+                data.password = password;
+            }
+
+            try {
+                hideError(editError);
+                hideSuccess(editSuccess);
+
+                const response = await fetch(`/api/users/${editingUser.username}`, {
+                    method: 'PUT',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showSuccess(editSuccess, '用户更新成功');
+                    setTimeout(() => {
+                        closeEditModal();
+                        loadUsers();
+                    }, 1000);
+                } else {
+                    showError(editError, result.error || '更新用户失败');
+                }
+            } catch (error) {
+                showError(editError, '网络错误: ' + error.message);
+            }
+        });
+
+        async function deleteUser(username) {
+            if (!confirm(`确定要删除用户 "${username}" 吗？此操作不可撤销。`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/users/${username}`, {
+                    method: 'DELETE',
+                    credentials: 'same-origin'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showSuccess(addSuccess, `用户 "${username}" 已删除`);
+                    loadUsers();
+                } else {
+                    showError(addError, result.error || '删除用户失败');
+                }
+            } catch (error) {
+                showError(addError, '网络错误: ' + error.message);
+            }
+        }
+
+        logoutBtn.addEventListener('click', () => {
+            window.location.href = '/logout';
+        });
+
+        function showError(element, message) {
+            element.textContent = message;
+            element.style.display = 'block';
+        }
+
+        function hideError(element) {
+            element.style.display = 'none';
+        }
+
+        function showSuccess(element, message) {
+            element.textContent = message;
+            element.style.display = 'block';
+            setTimeout(() => {
+                hideSuccess(element);
+            }, 3000);
+        }
+
+        function hideSuccess(element) {
+            element.style.display = 'none';
+        }
+
+        window.addEventListener('click', (e) => {
+            if (e.target === editModal) {
+                closeEditModal();
+            }
+        });
+
+        loadUsers();
+    </script>
+</body>
+</html>

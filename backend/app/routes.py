@@ -1,7 +1,7 @@
 from typing import List, Optional
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -20,7 +20,7 @@ from app.auth import (
 router = APIRouter()
 
 
-@router.post("/users/", response_model=Token, status_code=status.HTTP_201_CREATED)
+@router.post("/users/", response_model=Token, status_code=http_status.HTTP_201_CREATED)
 async def create_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(User).where(User.username == user.username)
@@ -28,7 +28,7 @@ async def create_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
     existing_user = result.scalar_one_or_none()
     if existing_user:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=http_status.HTTP_400_BAD_REQUEST,
             detail="用户名已存在"
         )
     
@@ -53,7 +53,7 @@ async def login(user: UserLogin, db: AsyncSession = Depends(get_db)):
     
     if not db_user or not verify_password(user.password, db_user.hashed_password):
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误",
             headers={"WWW-Authenticate": "Bearer"},
         )
@@ -85,7 +85,7 @@ async def get_user(
     return user
 
 
-@router.post("/events/", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/events/", response_model=EventResponse, status_code=http_status.HTTP_201_CREATED)
 async def create_event(
     event: EventCreate,
     current_user: User = Depends(get_current_user),
@@ -93,7 +93,7 @@ async def create_event(
 ):
     if event.owner_id != current_user.id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=http_status.HTTP_403_FORBIDDEN,
             detail="只能创建自己的日程"
         )
     
@@ -155,7 +155,7 @@ async def get_event(
     
     if not event.is_public and event.owner_id != current_user.id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=http_status.HTTP_403_FORBIDDEN,
             detail="无权查看此日程"
         )
     
@@ -176,7 +176,7 @@ async def update_event(
     
     if event.owner_id != current_user.id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=http_status.HTTP_403_FORBIDDEN,
             detail="只能修改自己的日程"
         )
     
@@ -191,7 +191,7 @@ async def update_event(
     return result.scalar_one()
 
 
-@router.delete("/events/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/events/{event_id}", status_code=http_status.HTTP_204_NO_CONTENT)
 async def delete_event(
     event_id: int,
     current_user: User = Depends(get_current_user),
@@ -204,7 +204,7 @@ async def delete_event(
     
     if event.owner_id != current_user.id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=http_status.HTTP_403_FORBIDDEN,
             detail="只能删除自己的日程"
         )
     
@@ -212,7 +212,7 @@ async def delete_event(
     await db.commit()
 
 
-@router.post("/meetings/", response_model=MeetingResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/meetings/", response_model=MeetingResponse, status_code=http_status.HTTP_201_CREATED)
 async def create_meeting(
     meeting: MeetingCreate,
     current_user: User = Depends(get_current_user),
@@ -220,7 +220,7 @@ async def create_meeting(
 ):
     if meeting.organizer_id != current_user.id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=http_status.HTTP_403_FORBIDDEN,
             detail="只能以自己的身份组织会议"
         )
     
@@ -311,7 +311,7 @@ async def get_meeting(
     is_participant = any(p.user_id == current_user.id for p in meeting.participants)
     if not is_organizer and not is_participant:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=http_status.HTTP_403_FORBIDDEN,
             detail="无权查看此会议"
         )
     
@@ -332,7 +332,7 @@ async def update_meeting(
     
     if meeting.organizer_id != current_user.id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=http_status.HTTP_403_FORBIDDEN,
             detail="只能修改自己组织的会议"
         )
     
@@ -350,7 +350,7 @@ async def update_meeting(
     return result.scalar_one()
 
 
-@router.delete("/meetings/{meeting_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/meetings/{meeting_id}", status_code=http_status.HTTP_204_NO_CONTENT)
 async def delete_meeting(
     meeting_id: int,
     current_user: User = Depends(get_current_user),
@@ -363,7 +363,7 @@ async def delete_meeting(
     
     if meeting.organizer_id != current_user.id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=http_status.HTTP_403_FORBIDDEN,
             detail="只能删除自己组织的会议"
         )
     
@@ -371,7 +371,7 @@ async def delete_meeting(
     await db.commit()
 
 
-@router.post("/meetings/{meeting_id}/participants/{user_id}", status_code=status.HTTP_201_CREATED)
+@router.post("/meetings/{meeting_id}/participants/{user_id}", status_code=http_status.HTTP_201_CREATED)
 async def add_participant(
     meeting_id: int,
     user_id: int,
@@ -385,7 +385,7 @@ async def add_participant(
     
     if meeting.organizer_id != current_user.id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=http_status.HTTP_403_FORBIDDEN,
             detail="只有会议组织者可以添加参与者"
         )
     
@@ -421,7 +421,7 @@ async def update_participant_status(
 ):
     if user_id != current_user.id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=http_status.HTTP_403_FORBIDDEN,
             detail="只能修改自己的参与状态"
         )
     

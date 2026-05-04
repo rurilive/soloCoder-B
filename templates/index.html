@@ -4,187 +4,11 @@
 
 {% block extra_css %}
 <style>
-    .main-layout {
-        display: flex;
-        gap: 20px;
-    }
-
-    .sidebar {
-        width: 280px;
-        flex-shrink: 0;
-    }
-
-    .sidebar-section {
-        background: #f8f9fa;
-        border-radius: 8px;
-        padding: 15px;
-        margin-bottom: 15px;
-        border: 1px solid #e9ecef;
-    }
-
-    .sidebar-section h3 {
-        font-size: 14px;
-        color: #333;
-        margin-bottom: 12px;
-        padding-bottom: 8px;
-        border-bottom: 1px solid #ddd;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .category-tree-sidebar {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-    }
-
-    .category-tree-sidebar li {
-        margin-bottom: 4px;
-    }
-
-    .category-item-sidebar {
-        display: flex;
-        align-items: center;
-        padding: 6px 10px;
-        border-radius: 4px;
-        cursor: pointer;
-        transition: background 0.2s;
-        text-decoration: none;
-        color: #333;
-    }
-
-    .category-item-sidebar:hover {
-        background: #e9ecef;
-    }
-
-    .category-item-sidebar.active {
-        background: #667eea;
-        color: white;
-    }
-
-    .category-item-sidebar .toggle-icon {
-        width: 16px;
-        text-align: center;
-        font-size: 10px;
-        color: #999;
-        cursor: pointer;
-        user-select: none;
-    }
-
-    .category-item-sidebar.active .toggle-icon {
-        color: rgba(255, 255, 255, 0.7);
-    }
-
-    .category-item-sidebar .folder-icon {
-        color: #f0ad4e;
-        margin-right: 6px;
-    }
-
-    .category-item-sidebar.active .folder-icon {
-        color: rgba(255, 255, 255, 0.9);
-    }
-
-    .category-item-sidebar .category-name {
-        flex: 1;
-        font-size: 13px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .category-item-sidebar .count {
-        font-size: 11px;
-        background: #e9ecef;
-        color: #666;
-        padding: 1px 6px;
-        border-radius: 10px;
-        margin-left: 6px;
-    }
-
-    .category-item-sidebar.active .count {
-        background: rgba(255, 255, 255, 0.2);
-        color: white;
-    }
-
-    .children-list {
-        margin-left: 18px;
-        margin-top: 4px;
-        list-style: none;
-        padding: 0;
-    }
-
-    .all-categories-link {
-        display: flex;
-        align-items: center;
-        padding: 6px 10px;
-        border-radius: 4px;
-        text-decoration: none;
-        color: #333;
-        margin-bottom: 8px;
-        background: #e9ecef;
-    }
-
-    .all-categories-link:hover {
-        background: #dde2e6;
-    }
-
-    .all-categories-link.active {
-        background: #667eea;
-        color: white;
-    }
-
-    .all-categories-link .icon {
-        margin-right: 6px;
-    }
-
-    .tags-cloud {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-    }
-
-    .tag-item {
-        display: inline-flex;
-        align-items: center;
-        padding: 4px 10px;
-        background: #e9ecef;
-        border-radius: 4px;
-        font-size: 12px;
-        color: #495057;
-        text-decoration: none;
-        transition: all 0.2s;
-    }
-
-    .tag-item:hover {
-        background: #667eea;
-        color: white;
-    }
-
-    .tag-item.active {
-        background: #667eea;
-        color: white;
-    }
-
-    .tag-item .remove-tag {
-        margin-left: 4px;
-        cursor: pointer;
-        font-size: 14px;
-        line-height: 1;
-    }
-
-    .content-area {
-        flex: 1;
-        min-width: 0;
-    }
-
     .page-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 20px;
-        flex-wrap: wrap;
-        gap: 10px;
+        margin-bottom: 30px;
     }
 
     .page-header h2 {
@@ -195,60 +19,6 @@
     .bookmark-count {
         color: #666;
         font-size: 14px;
-    }
-
-    .search-bar {
-        margin-bottom: 20px;
-    }
-
-    .search-bar input {
-        width: 100%;
-        padding: 12px 16px;
-        border: 1px solid #ddd;
-        border-radius: 6px;
-        font-size: 14px;
-        outline: none;
-        transition: border-color 0.3s;
-    }
-
-    .search-bar input:focus {
-        border-color: #667eea;
-    }
-
-    .filter-info {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-bottom: 15px;
-        flex-wrap: wrap;
-    }
-
-    .filter-pill {
-        display: inline-flex;
-        align-items: center;
-        padding: 4px 12px;
-        background: #e3f2fd;
-        color: #1565c0;
-        border-radius: 20px;
-        font-size: 13px;
-    }
-
-    .filter-pill .remove-filter {
-        margin-left: 8px;
-        cursor: pointer;
-        font-size: 14px;
-        line-height: 1;
-    }
-
-    .clear-filters {
-        color: #dc3545;
-        text-decoration: none;
-        font-size: 13px;
-        cursor: pointer;
-    }
-
-    .clear-filters:hover {
-        text-decoration: underline;
     }
 
     .bookmarks-grid {
@@ -268,24 +38,6 @@
     .bookmark-card:hover {
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         transform: translateY(-2px);
-    }
-
-    .bookmark-category {
-        font-size: 12px;
-        color: #667eea;
-        margin-bottom: 8px;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-    }
-
-    .bookmark-category a {
-        color: #667eea;
-        text-decoration: none;
-    }
-
-    .bookmark-category a:hover {
-        text-decoration: underline;
     }
 
     .bookmark-title {
@@ -341,13 +93,6 @@
         padding: 4px 10px;
         border-radius: 4px;
         font-size: 12px;
-        text-decoration: none;
-        transition: all 0.2s;
-    }
-
-    .tag:hover {
-        background: #667eea;
-        color: white;
     }
 
     .bookmark-meta {
@@ -417,267 +162,99 @@
         opacity: 0.9;
     }
 
-    @media (max-width: 900px) {
-        .main-layout {
-            flex-direction: column;
-        }
+    .search-bar {
+        margin-bottom: 20px;
+    }
 
-        .sidebar {
-            width: 100%;
-        }
+    .search-bar input {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 14px;
+        outline: none;
+        transition: border-color 0.3s;
+    }
+
+    .search-bar input:focus {
+        border-color: #667eea;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="main-layout">
-    <div class="sidebar">
-        <div class="sidebar-section">
-            <h3>📁 分类</h3>
-            <a href="/" class="all-categories-link {% if not current_category and not search_query and not selected_tags %}active{% endif %}">
-                <span class="icon">🏠</span>
-                <span>全部书签</span>
-            </a>
-            {% macro render_category_sidebar(category) %}
-            <li>
-                {% if category.children %}
-                <span class="toggle-icon" onclick="toggleCategoryChildren(this)">▼</span>
-                {% else %}
-                <span class="toggle-icon" style="visibility: hidden;">▶</span>
-                {% endif %}
-                <a href="/?category_id={{ category.id }}" class="category-item-sidebar {% if current_category and current_category.id == category.id %}active{% endif %}">
-                    <span class="folder-icon">📂</span>
-                    <span class="category-name">{{ category.name }}</span>
-                    <span class="count">{{ category.bookmarks|length }}</span>
-                </a>
-                {% if category.children %}
-                <ul class="children-list">
-                    {% for child in category.children %}
-                    {{ render_category_sidebar(child) }}
-                    {% endfor %}
-                </ul>
-                {% endif %}
-            </li>
-            {% endmacro %}
-            <ul class="category-tree-sidebar">
-                {% for category in category_hierarchy %}
-                {{ render_category_sidebar(category) }}
-                {% endfor %}
-            </ul>
-        </div>
-
-        {% if all_tags %}
-        <div class="sidebar-section">
-            <h3>🏷️ 标签</h3>
-            <div class="tags-cloud">
-                {% for tag in all_tags %}
-                <a href="/?tag={{ tag }}" class="tag-item {% if tag in selected_tags %}active{% endif %}">
-                    #{{ tag }}
-                </a>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
-    </div>
-
-    <div class="content-area">
-        <div class="page-header">
-            <div>
-                <h2>
-                    {% if current_category %}
-                    📂 {{ current_category.name }}
-                    {% elif search_query %}
-                    🔍 搜索结果
-                    {% else %}
-                    📋 我的书签
-                    {% endif %}
-                </h2>
-                {% if current_category and current_category.description %}
-                <p style="color: #666; font-size: 14px; margin-top: 5px;">{{ current_category.description }}</p>
-                {% endif %}
-            </div>
-            <span class="bookmark-count">共 {{ bookmarks|length }} 个书签</span>
-        </div>
-
-        <div class="search-bar">
-            <input type="text" id="searchInput" placeholder="🔍 搜索书签（标题、网址、描述、标签）..." value="{{ search_query or '' }}">
-        </div>
-
-        {% if search_query or current_category or selected_tags %}
-        <div class="filter-info">
-            {% if current_category %}
-            <span class="filter-pill">
-                📂 {{ current_category.name }}
-                <span class="remove-filter" onclick="removeFilter('category')">&times;</span>
-            </span>
-            {% endif %}
-            {% if search_query %}
-            <span class="filter-pill">
-                🔍 "{{ search_query }}"
-                <span class="remove-filter" onclick="removeFilter('search')">&times;</span>
-            </span>
-            {% endif %}
-            {% for tag in selected_tags %}
-            <span class="filter-pill">
-                🏷️ #{{ tag }}
-                <span class="remove-filter" onclick="removeTagFilter('{{ tag }}')">&times;</span>
-            </span>
-            {% endfor %}
-            <span class="clear-filters" onclick="clearAllFilters()">清除全部筛选</span>
-        </div>
-        {% endif %}
-
-        {% if bookmarks %}
-        <div class="bookmarks-grid" id="bookmarksGrid">
-            {% for bookmark in bookmarks %}
-            <div class="bookmark-card" data-title="{{ bookmark.title|lower }}" data-url="{{ bookmark.url|lower }}" data-tags="{{ bookmark.tags|join(',')|lower }}">
-                {% if bookmark.category_id and bookmark.category_id in category_map %}
-                <div class="bookmark-category">
-                    📂 <a href="/?category_id={{ bookmark.category_id }}">{{ category_map[bookmark.category_id].name }}</a>
-                </div>
-                {% endif %}
-                <div class="bookmark-title">
-                    <a href="{{ bookmark.url }}" target="_blank" rel="noopener noreferrer">
-                        {{ bookmark.title }}
-                    </a>
-                </div>
-                <div class="bookmark-url">
-                    <a href="{{ bookmark.url }}" target="_blank" rel="noopener noreferrer">
-                        {{ bookmark.url }}
-                    </a>
-                </div>
-                {% if bookmark.description %}
-                <div class="bookmark-description">{{ bookmark.description }}</div>
-                {% endif %}
-                {% if bookmark.tags %}
-                <div class="bookmark-tags">
-                    {% for tag in bookmark.tags %}
-                    <a href="/?tag={{ tag }}" class="tag">#{{ tag }}</a>
-                    {% endfor %}
-                </div>
-                {% endif %}
-                <div class="bookmark-meta">
-                    创建于: {{ bookmark.created_at[:10] }}
-                    {% if bookmark.updated_at %}
-                    | 更新于: {{ bookmark.updated_at[:10] }}
-                    {% endif %}
-                </div>
-                <div class="bookmark-actions">
-                    <a href="/edit/{{ bookmark.id }}" class="btn-edit">✏️ 编辑</a>
-                    <a href="/delete/{{ bookmark.id }}" class="btn-delete" onclick="return confirm('确定要删除这个书签吗？');">🗑️ 删除</a>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <div class="empty-state">
-            <h3>📭 没有找到书签</h3>
-            <p>
-                {% if search_query or current_category or selected_tags %}
-                没有匹配的书签，请尝试调整筛选条件
-                {% else %}
-                开始添加您的第一个网络书签吧！
-                {% endif %}
-            </p>
-            {% if not search_query and not current_category and not selected_tags %}
-            <a href="/add">➕ 添加第一个书签</a>
-            {% else %}
-            <a href="/" style="display: inline-block; background: #e9ecef; color: #495057; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 500;">返回全部书签</a>
-            {% endif %}
-        </div>
-        {% endif %}
-    </div>
+<div class="page-header">
+    <h2>📋 我的书签</h2>
+    <span class="bookmark-count">共 {{ bookmarks|length }} 个书签</span>
 </div>
+
+{% if bookmarks %}
+<div class="search-bar">
+    <input type="text" id="searchInput" placeholder="🔍 搜索书签...">
+</div>
+
+<div class="bookmarks-grid" id="bookmarksGrid">
+    {% for bookmark in bookmarks %}
+    <div class="bookmark-card" data-title="{{ bookmark.title|lower }}" data-url="{{ bookmark.url|lower }}" data-tags="{{ bookmark.tags|join(',')|lower }}">
+        <div class="bookmark-title">
+            <a href="{{ bookmark.url }}" target="_blank" rel="noopener noreferrer">
+                {{ bookmark.title }}
+            </a>
+        </div>
+        <div class="bookmark-url">
+            <a href="{{ bookmark.url }}" target="_blank" rel="noopener noreferrer">
+                {{ bookmark.url }}
+            </a>
+        </div>
+        {% if bookmark.description %}
+        <div class="bookmark-description">{{ bookmark.description }}</div>
+        {% endif %}
+        {% if bookmark.tags %}
+        <div class="bookmark-tags">
+            {% for tag in bookmark.tags %}
+            <span class="tag">#{{ tag }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <div class="bookmark-meta">
+            创建于: {{ bookmark.created_at[:10] }}
+            {% if bookmark.updated_at %}
+            | 更新于: {{ bookmark.updated_at[:10] }}
+            {% endif %}
+        </div>
+        <div class="bookmark-actions">
+            <a href="/edit/{{ bookmark.id }}" class="btn-edit">✏️ 编辑</a>
+            <a href="/delete/{{ bookmark.id }}" class="btn-delete" onclick="return confirm('确定要删除这个书签吗？');">🗑️ 删除</a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <h3>📭 还没有书签</h3>
+    <p>开始添加您的第一个网络书签吧！</p>
+    <a href="/add">➕ 添加第一个书签</a>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    document.getElementById('searchInput').addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-            const searchTerm = this.value.trim();
-            updateUrlParams({ q: searchTerm || null, page: null });
-        }
+    document.getElementById('searchInput').addEventListener('input', function(e) {
+        const searchTerm = e.target.value.toLowerCase();
+        const cards = document.querySelectorAll('.bookmark-card');
+        
+        cards.forEach(card => {
+            const title = card.dataset.title;
+            const url = card.dataset.url;
+            const tags = card.dataset.tags;
+            
+            if (title.includes(searchTerm) || url.includes(searchTerm) || tags.includes(searchTerm)) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
     });
-
-    function toggleCategoryChildren(btn) {
-        const li = btn.closest('li');
-        const childrenList = li.querySelector('.children-list');
-        if (childrenList) {
-            if (childrenList.style.display === 'none') {
-                childrenList.style.display = 'block';
-                btn.textContent = '▼';
-            } else {
-                childrenList.style.display = 'none';
-                btn.textContent = '▶';
-            }
-        }
-    }
-
-    function getCurrentUrlParams() {
-        const params = new URLSearchParams(window.location.search);
-        const result = {};
-        for (const [key, value] of params.entries()) {
-            if (key === 'tag') {
-                if (!result.tags) result.tags = [];
-                result.tags.push(value);
-            } else {
-                result[key] = value;
-            }
-        }
-        return result;
-    }
-
-    function updateUrlParams(newParams) {
-        const current = getCurrentUrlParams();
-        const params = new URLSearchParams();
-
-        if (newParams.category_id !== undefined) {
-            if (newParams.category_id) params.set('category_id', newParams.category_id);
-        } else if (current.category_id) {
-            params.set('category_id', current.category_id);
-        }
-
-        if (newParams.q !== undefined) {
-            if (newParams.q) params.set('q', newParams.q);
-        } else if (current.q) {
-            params.set('q', current.q);
-        }
-
-        let tags = current.tags || [];
-        if (newParams.tag !== undefined) {
-            if (newParams.tag && !tags.includes(newParams.tag)) {
-                tags.push(newParams.tag);
-            }
-        }
-        if (newParams.removeTag) {
-            tags = tags.filter(t => t !== newParams.removeTag);
-        }
-        if (newParams.clearTags) {
-            tags = [];
-        }
-        tags.forEach(tag => params.append('tag', tag));
-
-        let url = window.location.pathname;
-        if (params.toString()) {
-            url += '?' + params.toString();
-        }
-        window.location.href = url;
-    }
-
-    function removeFilter(type) {
-        if (type === 'category') {
-            updateUrlParams({ category_id: null });
-        } else if (type === 'search') {
-            updateUrlParams({ q: null });
-        }
-    }
-
-    function removeTagFilter(tag) {
-        updateUrlParams({ removeTag: tag });
-    }
-
-    function clearAllFilters() {
-        window.location.href = window.location.pathname;
-    }
 </script>
 {% endblock %}

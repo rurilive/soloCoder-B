@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 书签数据文件
+bookmarks.json
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# 日志文件
+*.log
+logs/
+
+# 测试覆盖
+.coverage
+htmlcov/
+.tox/
+.nox/
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# mypy
+.mypy_cache/
+
+# pyright
+.pyright/
+
+# 虚拟环境
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

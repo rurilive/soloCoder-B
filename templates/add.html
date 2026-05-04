@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+
+{% block title %}添加书签 - 网络书签管理器{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-container {
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .form-header {
+        margin-bottom: 30px;
+    }
+
+    .form-header h2 {
+        color: #333;
+        font-size: 24px;
+        margin-bottom: 10px;
+    }
+
+    .form-header p {
+        color: #666;
+        font-size: 14px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        color: #333;
+        font-weight: 500;
+    }
+
+    .form-group label .required {
+        color: #dc3545;
+        margin-left: 2px;
+    }
+
+    .form-group input[type="text"],
+    .form-group input[type="url"],
+    .form-group textarea {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 14px;
+        outline: none;
+        transition: border-color 0.3s;
+        font-family: inherit;
+    }
+
+    .form-group input[type="text"]:focus,
+    .form-group input[type="url"]:focus,
+    .form-group textarea:focus {
+        border-color: #667eea;
+    }
+
+    .form-group textarea {
+        min-height: 100px;
+        resize: vertical;
+    }
+
+    .form-group .help-text {
+        color: #999;
+        font-size: 12px;
+        margin-top: 4px;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 15px;
+        margin-top: 30px;
+    }
+
+    .btn-submit {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 12px 30px;
+        border: none;
+        border-radius: 6px;
+        font-size: 16px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: opacity 0.3s;
+    }
+
+    .btn-submit:hover {
+        opacity: 0.9;
+    }
+
+    .btn-cancel {
+        background: #e9ecef;
+        color: #495057;
+        padding: 12px 30px;
+        border: none;
+        border-radius: 6px;
+        font-size: 16px;
+        font-weight: 500;
+        cursor: pointer;
+        text-decoration: none;
+        transition: background 0.3s;
+    }
+
+    .btn-cancel:hover {
+        background: #dde2e6;
+    }
+
+    .tags-input-container {
+        position: relative;
+    }
+
+    .tags-display {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 10px;
+    }
+
+    .tag-item {
+        display: flex;
+        align-items: center;
+        background: #667eea;
+        color: white;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 13px;
+    }
+
+    .tag-item .remove-tag {
+        margin-left: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        line-height: 1;
+    }
+
+    .tag-item .remove-tag:hover {
+        opacity: 0.8;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <div class="form-header">
+        <h2>➕ 添加新书签</h2>
+        <p>填写以下信息来保存您的网络书签</p>
+    </div>
+
+    <form method="POST" action="/add">
+        <div class="form-group">
+            <label for="title">标题 <span class="required">*</span></label>
+            <input type="text" id="title" name="title" placeholder="例如：Google 搜索" required>
+        </div>
+
+        <div class="form-group">
+            <label for="url">网址 <span class="required">*</span></label>
+            <input type="url" id="url" name="url" placeholder="https://www.example.com" required>
+        </div>
+
+        <div class="form-group">
+            <label for="description">描述</label>
+            <textarea id="description" name="description" placeholder="简要描述这个书签的用途..."></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="tags">标签</label>
+            <div class="tags-input-container">
+                <div class="tags-display" id="tagsDisplay"></div>
+                <input type="text" id="tags" name="tags" placeholder="输入标签后按回车添加，多个标签用逗号分隔">
+                <p class="help-text">按回车键添加标签，多个标签用逗号分隔</p>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-submit">💾 保存书签</button>
+            <a href="/" class="btn-cancel">取消</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const tagsInput = document.getElementById('tags');
+    const tagsDisplay = document.getElementById('tagsDisplay');
+    let tags = [];
+
+    function updateTagsDisplay() {
+        tagsDisplay.innerHTML = tags.map((tag, index) => `
+            <span class="tag-item">
+                #${tag}
+                <span class="remove-tag" onclick="removeTag(${index})">&times;</span>
+            </span>
+        `).join('');
+        tagsInput.value = tags.join(',');
+    }
+
+    function addTag(tag) {
+        tag = tag.trim().toLowerCase();
+        if (tag && !tags.includes(tag)) {
+            tags.push(tag);
+            updateTagsDisplay();
+        }
+    }
+
+    function removeTag(index) {
+        tags.splice(index, 1);
+        updateTagsDisplay();
+    }
+
+    tagsInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const value = this.value.trim();
+            if (value) {
+                if (value.includes(',')) {
+                    value.split(',').forEach(tag => addTag(tag));
+                } else {
+                    addTag(value);
+                }
+                this.value = '';
+            }
+        }
+    });
+
+    tagsInput.addEventListener('blur', function() {
+        const value = this.value.trim();
+        if (value) {
+            if (value.includes(',')) {
+                value.split(',').forEach(tag => addTag(tag));
+            } else {
+                addTag(value);
+            }
+            this.value = '';
+        }
+    });
+</script>
+{% endblock %}

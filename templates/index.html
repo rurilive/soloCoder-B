@@ -4,6 +4,106 @@
 
 {% block extra_css %}
 <style>
+    .main-container {
+        display: flex;
+        gap: 30px;
+    }
+
+    .sidebar {
+        width: 250px;
+        flex-shrink: 0;
+    }
+
+    .content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .sidebar-section {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+
+    .sidebar-section h3 {
+        color: #333;
+        font-size: 16px;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .category-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .category-item {
+        margin-bottom: 5px;
+    }
+
+    .category-link {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 12px;
+        border-radius: 4px;
+        text-decoration: none;
+        color: #555;
+        transition: all 0.3s;
+    }
+
+    .category-link:hover,
+    .category-link.active {
+        background: #667eea;
+        color: white;
+    }
+
+    .category-name {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .category-count {
+        background: rgba(0, 0, 0, 0.1);
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 12px;
+    }
+
+    .category-link:hover .category-count,
+    .category-link.active .category-count {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    .sub-categories {
+        list-style: none;
+        padding-left: 20px;
+        margin-top: 5px;
+    }
+
+    .all-categories-link {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 12px;
+        border-radius: 4px;
+        text-decoration: none;
+        color: #555;
+        transition: all 0.3s;
+        margin-bottom: 10px;
+        font-weight: 500;
+    }
+
+    .all-categories-link:hover,
+    .all-categories-link.active {
+        background: #667eea;
+        color: white;
+    }
+
     .page-header {
         display: flex;
         justify-content: space-between;
@@ -84,7 +184,7 @@
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
-        margin-bottom: 15px;
+        margin-bottom: 10px;
     }
 
     .tag {
@@ -93,6 +193,16 @@
         padding: 4px 10px;
         border-radius: 4px;
         font-size: 12px;
+    }
+
+    .bookmark-category {
+        display: inline-block;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 3px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        margin-bottom: 10px;
     }
 
     .bookmark-meta {
@@ -179,82 +289,199 @@
     .search-bar input:focus {
         border-color: #667eea;
     }
+
+    .search-form {
+        display: flex;
+        gap: 10px;
+    }
+
+    .search-form input {
+        flex: 1;
+    }
+
+    .search-form button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 12px 20px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: opacity 0.3s;
+    }
+
+    .search-form button:hover {
+        opacity: 0.9;
+    }
+
+    .current-category-info {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 15px 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+
+    .current-category-info h3 {
+        font-size: 18px;
+        margin-bottom: 5px;
+    }
+
+    .current-category-info p {
+        font-size: 14px;
+        opacity: 0.9;
+        margin: 0;
+    }
+
+    .clear-filter-link {
+        color: white;
+        text-decoration: underline;
+        margin-left: 10px;
+        font-size: 13px;
+    }
+
+    .clear-filter-link:hover {
+        opacity: 0.8;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h2>📋 我的书签</h2>
-    <span class="bookmark-count">共 {{ bookmarks|length }} 个书签</span>
-</div>
-
-{% if bookmarks %}
-<div class="search-bar">
-    <input type="text" id="searchInput" placeholder="🔍 搜索书签...">
-</div>
-
-<div class="bookmarks-grid" id="bookmarksGrid">
-    {% for bookmark in bookmarks %}
-    <div class="bookmark-card" data-title="{{ bookmark.title|lower }}" data-url="{{ bookmark.url|lower }}" data-tags="{{ bookmark.tags|join(',')|lower }}">
-        <div class="bookmark-title">
-            <a href="{{ bookmark.url }}" target="_blank" rel="noopener noreferrer">
-                {{ bookmark.title }}
+<div class="main-container">
+    <div class="sidebar">
+        <div class="sidebar-section">
+            <h3>📁 分类</h3>
+            <a href="/" class="all-categories-link {% if not current_category %}active{% endif %}">
+                <span>📂 全部书签</span>
+                <span class="category-count">{{ bookmarks|length }}</span>
             </a>
-        </div>
-        <div class="bookmark-url">
-            <a href="{{ bookmark.url }}" target="_blank" rel="noopener noreferrer">
-                {{ bookmark.url }}
-            </a>
-        </div>
-        {% if bookmark.description %}
-        <div class="bookmark-description">{{ bookmark.description }}</div>
-        {% endif %}
-        {% if bookmark.tags %}
-        <div class="bookmark-tags">
-            {% for tag in bookmark.tags %}
-            <span class="tag">#{{ tag }}</span>
-            {% endfor %}
-        </div>
-        {% endif %}
-        <div class="bookmark-meta">
-            创建于: {{ bookmark.created_at[:10] }}
-            {% if bookmark.updated_at %}
-            | 更新于: {{ bookmark.updated_at[:10] }}
+            
+            {% if categories %}
+            <ul class="category-list">
+                {% for category in categories %}
+                <li class="category-item">
+                    <a href="/?category_id={{ category.id }}" class="category-link {% if current_category and current_category.id == category.id %}active{% endif %}">
+                        <span class="category-name">
+                            📁 {{ category.name }}
+                        </span>
+                        <span class="category-count">{{ category.bookmark_count }}</span>
+                    </a>
+                    {% if category.children %}
+                    <ul class="sub-categories">
+                        {% for child in category.children %}
+                        <li class="category-item">
+                            <a href="/?category_id={{ child.id }}" class="category-link {% if current_category and current_category.id == child.id %}active{% endif %}">
+                                <span class="category-name">
+                                    📄 {{ child.name }}
+                                </span>
+                                <span class="category-count">{{ child.bookmark_count }}</span>
+                            </a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
             {% endif %}
         </div>
-        <div class="bookmark-actions">
-            <a href="/edit/{{ bookmark.id }}" class="btn-edit">✏️ 编辑</a>
-            <a href="/delete/{{ bookmark.id }}" class="btn-delete" onclick="return confirm('确定要删除这个书签吗？');">🗑️ 删除</a>
-        </div>
     </div>
-    {% endfor %}
+
+    <div class="content">
+        {% if current_category %}
+        <div class="current-category-info">
+            <h3>📁 {{ current_category.name }}</h3>
+            {% if current_category.description %}
+            <p>{{ current_category.description }}</p>
+            {% endif %}
+            <a href="/" class="clear-filter-link">✕ 清除筛选</a>
+        </div>
+        {% endif %}
+
+        <div class="page-header">
+            <h2>
+                {% if current_category %}
+                📋 {{ current_category.name }} 中的书签
+                {% else %}
+                📋 我的书签
+                {% endif %}
+            </h2>
+            <span class="bookmark-count">共 {{ bookmarks|length }} 个书签</span>
+        </div>
+
+        <div class="search-bar">
+            <form class="search-form" method="GET" action="/">
+                <input type="text" name="search" id="searchInput" placeholder="🔍 搜索书签（标题、网址、描述、标签）..." value="{{ search_term or '' }}">
+                {% if current_category %}
+                <input type="hidden" name="category_id" value="{{ current_category.id }}">
+                {% endif %}
+                <button type="submit">🔍 搜索</button>
+            </form>
+        </div>
+
+        {% if bookmarks %}
+        <div class="bookmarks-grid" id="bookmarksGrid">
+            {% for bookmark in bookmarks %}
+            <div class="bookmark-card">
+                <div class="bookmark-title">
+                    <a href="{{ bookmark.url }}" target="_blank" rel="noopener noreferrer">
+                        {{ bookmark.title }}
+                    </a>
+                </div>
+                <div class="bookmark-url">
+                    <a href="{{ bookmark.url }}" target="_blank" rel="noopener noreferrer">
+                        {{ bookmark.url }}
+                    </a>
+                </div>
+                {% if bookmark.description %}
+                <div class="bookmark-description">{{ bookmark.description }}</div>
+                {% endif %}
+                {% if bookmark.category_name %}
+                <span class="bookmark-category">📁 {{ bookmark.category_name }}</span>
+                {% endif %}
+                {% if bookmark.tags %}
+                <div class="bookmark-tags">
+                    {% for tag in bookmark.tags %}
+                    <span class="tag">#{{ tag }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                <div class="bookmark-meta">
+                    创建于: {{ bookmark.created_at[:10] }}
+                    {% if bookmark.updated_at %}
+                    | 更新于: {{ bookmark.updated_at[:10] }}
+                    {% endif %}
+                </div>
+                <div class="bookmark-actions">
+                    <a href="/edit/{{ bookmark.id }}" class="btn-edit">✏️ 编辑</a>
+                    <a href="/delete/{{ bookmark.id }}" class="btn-delete" onclick="return confirm('确定要删除这个书签吗？');">🗑️ 删除</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <h3>📭 还没有书签</h3>
+            <p>
+                {% if search_term %}
+                没有找到匹配的书签，请尝试其他关键词。
+                {% elif current_category %}
+                该分类下还没有书签。
+                {% else %}
+                开始添加您的第一个网络书签吧！
+                {% endif %}
+            </p>
+            <a href="/add">➕ 添加书签</a>
+        </div>
+        {% endif %}
+    </div>
 </div>
-{% else %}
-<div class="empty-state">
-    <h3>📭 还没有书签</h3>
-    <p>开始添加您的第一个网络书签吧！</p>
-    <a href="/add">➕ 添加第一个书签</a>
-</div>
-{% endif %}
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    document.getElementById('searchInput').addEventListener('input', function(e) {
-        const searchTerm = e.target.value.toLowerCase();
-        const cards = document.querySelectorAll('.bookmark-card');
-        
-        cards.forEach(card => {
-            const title = card.dataset.title;
-            const url = card.dataset.url;
-            const tags = card.dataset.tags;
-            
-            if (title.includes(searchTerm) || url.includes(searchTerm) || tags.includes(searchTerm)) {
-                card.style.display = 'block';
-            } else {
-                card.style.display = 'none';
-            }
-        });
-    });
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.focus();
+    }
 </script>
 {% endblock %}

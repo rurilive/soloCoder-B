@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}编辑分类 - 网络书签管理器{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-container {
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .form-header {
+        margin-bottom: 30px;
+    }
+
+    .form-header h2 {
+        color: #333;
+        font-size: 24px;
+        margin-bottom: 10px;
+    }
+
+    .form-header p {
+        color: #666;
+        font-size: 14px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        color: #333;
+        font-weight: 500;
+    }
+
+    .form-group label .required {
+        color: #dc3545;
+        margin-left: 2px;
+    }
+
+    .form-group input[type="text"],
+    .form-group textarea,
+    .form-group select {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 14px;
+        outline: none;
+        transition: border-color 0.3s;
+        font-family: inherit;
+        background: white;
+    }
+
+    .form-group input[type="text"]:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+        border-color: #667eea;
+    }
+
+    .form-group textarea {
+        min-height: 100px;
+        resize: vertical;
+    }
+
+    .form-group .help-text {
+        color: #999;
+        font-size: 12px;
+        margin-top: 4px;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 15px;
+        margin-top: 30px;
+    }
+
+    .btn-submit {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 12px 30px;
+        border: none;
+        border-radius: 6px;
+        font-size: 16px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: opacity 0.3s;
+    }
+
+    .btn-submit:hover {
+        opacity: 0.9;
+    }
+
+    .btn-cancel {
+        background: #e9ecef;
+        color: #495057;
+        padding: 12px 30px;
+        border: none;
+        border-radius: 6px;
+        font-size: 16px;
+        font-weight: 500;
+        cursor: pointer;
+        text-decoration: none;
+        transition: background 0.3s;
+    }
+
+    .btn-cancel:hover {
+        background: #dde2e6;
+    }
+
+    .category-info {
+        background: #f8f9fa;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 20px;
+        font-size: 13px;
+        color: #666;
+    }
+
+    .category-info p {
+        margin: 5px 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <div class="form-header">
+        <h2>✏️ 编辑分类</h2>
+        <p>修改分类的信息</p>
+    </div>
+
+    <div class="category-info">
+        <p><strong>创建时间:</strong> {{ category.created_at[:10] }}</p>
+        {% if category.updated_at %}
+        <p><strong>上次更新:</strong> {{ category.updated_at[:10] }}</p>
+        {% endif %}
+        <p><strong>书签数量:</strong> {{ category.bookmark_count }}</p>
+    </div>
+
+    <form method="POST" action="/categories/edit/{{ category.id }}">
+        <div class="form-group">
+            <label for="name">分类名称 <span class="required">*</span></label>
+            <input type="text" id="name" name="name" value="{{ category.name }}" required>
+        </div>
+
+        <div class="form-group">
+            <label for="parent_id">父分类</label>
+            <select id="parent_id" name="parent_id">
+                <option value="">-- 无父分类（作为顶级分类）--</option>
+                {% for cat in all_categories %}
+                <option value="{{ cat.id }}" {% if category.parent_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                {% endfor %}
+            </select>
+            <p class="help-text">选择一个父分类可以创建层级结构（注意：不能选择自己作为父分类）</p>
+        </div>
+
+        <div class="form-group">
+            <label for="description">描述</label>
+            <textarea id="description" name="description" placeholder="简要描述这个分类的用途...">{{ category.description or '' }}</textarea>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-submit">💾 保存修改</button>
+            <a href="/categories" class="btn-cancel">取消</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

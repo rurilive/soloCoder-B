@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+
+{% block title %}分类管理 - 网络书签管理器{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+    }
+
+    .page-header h2 {
+        color: #333;
+        font-size: 20px;
+    }
+
+    .btn-add {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: 500;
+        transition: opacity 0.3s;
+    }
+
+    .btn-add:hover {
+        opacity: 0.9;
+    }
+
+    .categories-container {
+        display: flex;
+        gap: 30px;
+    }
+
+    .categories-tree {
+        flex: 1;
+    }
+
+    .category-item {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 15px;
+        border: 1px solid #e9ecef;
+        transition: all 0.3s;
+    }
+
+    .category-item:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .category-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 10px;
+    }
+
+    .category-name {
+        font-size: 18px;
+        font-weight: 600;
+        color: #333;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .category-actions {
+        display: flex;
+        gap: 10px;
+    }
+
+    .category-actions a {
+        padding: 6px 12px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-size: 13px;
+        transition: all 0.3s;
+    }
+
+    .btn-edit {
+        background: #667eea;
+        color: white;
+    }
+
+    .btn-edit:hover {
+        background: #5568d3;
+    }
+
+    .btn-delete {
+        background: #dc3545;
+        color: white;
+    }
+
+    .btn-delete:hover {
+        background: #c82333;
+    }
+
+    .category-meta {
+        color: #666;
+        font-size: 14px;
+        margin-bottom: 10px;
+    }
+
+    .category-description {
+        color: #555;
+        font-size: 14px;
+        line-height: 1.5;
+        margin-bottom: 10px;
+    }
+
+    .category-stats {
+        display: flex;
+        gap: 20px;
+        color: #999;
+        font-size: 12px;
+    }
+
+    .sub-categories {
+        margin-left: 30px;
+        margin-top: 15px;
+        border-left: 2px solid #e9ecef;
+        padding-left: 20px;
+    }
+
+    .sub-category-item {
+        background: white;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 10px;
+        border: 1px solid #e9ecef;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #666;
+    }
+
+    .empty-state h3 {
+        font-size: 20px;
+        margin-bottom: 10px;
+        color: #333;
+    }
+
+    .empty-state p {
+        margin-bottom: 20px;
+    }
+
+    .empty-state a {
+        display: inline-block;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 12px 24px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: 500;
+    }
+
+    .empty-state a:hover {
+        opacity: 0.9;
+    }
+
+    .parent-indicator {
+        color: #999;
+        font-size: 12px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>📁 分类管理</h2>
+    <a href="/categories/add" class="btn-add">➕ 添加分类</a>
+</div>
+
+{% if categories %}
+<div class="categories-tree">
+    {% for category in categories %}
+    <div class="category-item">
+        <div class="category-header">
+            <div>
+                <div class="category-name">
+                    📁 {{ category.name }}
+                </div>
+                {% if category.description %}
+                <div class="category-description">{{ category.description }}</div>
+                {% endif %}
+            </div>
+            <div class="category-actions">
+                <a href="/categories/edit/{{ category.id }}" class="btn-edit">✏️ 编辑</a>
+                <a href="/categories/delete/{{ category.id }}" class="btn-delete" onclick="return confirm('确定要删除这个分类吗？子分类将被提升到上一级，相关书签将取消分类。');">🗑️ 删除</a>
+            </div>
+        </div>
+        <div class="category-stats">
+            <span>📚 书签数量: {{ category.bookmark_count }}</span>
+            {% if category.children %}
+            <span>📂 子分类: {{ category.children|length }}</span>
+            {% endif %}
+        </div>
+
+        {% if category.children %}
+        <div class="sub-categories">
+            {% for child in category.children %}
+            <div class="sub-category-item">
+                <div class="category-header">
+                    <div>
+                        <div class="category-name">
+                            📄 {{ child.name }}
+                        </div>
+                        {% if child.description %}
+                        <div class="category-description">{{ child.description }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="category-actions">
+                        <a href="/categories/edit/{{ child.id }}" class="btn-edit">✏️ 编辑</a>
+                        <a href="/categories/delete/{{ child.id }}" class="btn-delete" onclick="return confirm('确定要删除这个分类吗？');">🗑️ 删除</a>
+                    </div>
+                </div>
+                <div class="category-stats">
+                    <span>📚 书签数量: {{ child.bookmark_count }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <h3>📭 还没有分类</h3>
+    <p>创建分类来更好地组织您的书签吧！</p>
+    <a href="/categories/add">➕ 添加第一个分类</a>
+</div>
+{% endif %}
+{% endblock %}

@@ -11,6 +11,7 @@ import secrets
 import uuid
 from passlib.context import CryptContext
 import base64
+import hashlib
 
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, ForeignKey
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
@@ -20,6 +21,9 @@ from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def hash_password_for_bcrypt(password: str) -> str:
+    return hashlib.sha256(password.encode('utf-8')).digest().hex()
 security = HTTPBasic(auto_error=False)
 
 AES_KEY = b'soloCoderBookmarkSecretKey2026Ab'
@@ -227,10 +231,12 @@ def get_db():
         db.close()
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    hashed_input = hash_password_for_bcrypt(plain_password)
+    return pwd_context.verify(hashed_input, hashed_password)
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    hashed_input = hash_password_for_bcrypt(password)
+    return pwd_context.hash(hashed_input)
 
 def get_user_by_username(db, username: str):
     return db.query(UserDB).filter(UserDB.username == username).first()

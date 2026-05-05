@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>注册 - 网络书签管理器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .register-container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .register-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .register-header h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .register-header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .form-group input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group input::placeholder {
+            color: #aaa;
+        }
+
+        .form-group input.error {
+            border-color: #dc3545;
+        }
+
+        .form-hint {
+            font-size: 12px;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        .form-hint.error {
+            color: #dc3545;
+        }
+
+        .password-strength {
+            margin-top: 8px;
+            height: 4px;
+            background: #e9ecef;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .password-strength-bar {
+            height: 100%;
+            width: 0;
+            transition: width 0.3s, background-color 0.3s;
+        }
+
+        .password-strength-bar.weak {
+            width: 33%;
+            background: #dc3545;
+        }
+
+        .password-strength-bar.medium {
+            width: 66%;
+            background: #ffc107;
+        }
+
+        .password-strength-bar.strong {
+            width: 100%;
+            background: #28a745;
+        }
+
+        .register-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.3s, transform 0.2s;
+        }
+
+        .register-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .register-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 25px 0;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #e9ecef;
+        }
+
+        .divider span {
+            padding: 0 15px;
+            color: #999;
+            font-size: 13px;
+        }
+
+        .login-link {
+            text-align: center;
+        }
+
+        .login-link p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .login-link a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.3s;
+        }
+
+        .login-link a:hover {
+            color: #764ba2;
+            text-decoration: underline;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            border: 1px solid #f5c6cb;
+        }
+
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            border: 1px solid #c3e6cb;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s ease-in-out infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .password-wrapper {
+            position: relative;
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #999;
+            font-size: 18px;
+            padding: 4px;
+        }
+
+        .password-toggle:hover {
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="register-container">
+        <div class="register-header">
+            <h1>📚 创建账号</h1>
+            <p>加入我们，开始管理您的网络书签</p>
+        </div>
+
+        <div id="message-container"></div>
+
+        <form id="registerForm">
+            <div class="form-group">
+                <label for="username">用户名 *</label>
+                <input type="text" id="username" name="username" placeholder="请输入用户名（3-20个字符）" required>
+                <div class="form-hint">用户名只能包含字母、数字和下划线，长度 3-20 个字符</div>
+            </div>
+
+            <div class="form-group">
+                <label for="email">邮箱</label>
+                <input type="email" id="email" name="email" placeholder="请输入邮箱地址（可选）">
+                <div class="form-hint">用于找回密码和接收通知</div>
+            </div>
+
+            <div class="form-group">
+                <label for="password">密码 *</label>
+                <div class="password-wrapper">
+                    <input type="password" id="password" name="password" placeholder="请输入密码（至少6个字符）" required>
+                    <button type="button" class="password-toggle" id="togglePassword" aria-label="切换密码可见性">
+                        👁️
+                    </button>
+                </div>
+                <div class="password-strength">
+                    <div class="password-strength-bar" id="passwordStrengthBar"></div>
+                </div>
+                <div class="form-hint" id="passwordHint">密码长度至少 6 个字符，建议包含大小写字母和数字</div>
+            </div>
+
+            <div class="form-group">
+                <label for="confirmPassword">确认密码 *</label>
+                <div class="password-wrapper">
+                    <input type="password" id="confirmPassword" name="confirmPassword" placeholder="请再次输入密码" required>
+                    <button type="button" class="password-toggle" id="toggleConfirmPassword" aria-label="切换密码可见性">
+                        👁️
+                    </button>
+                </div>
+                <div class="form-hint" id="confirmPasswordHint">请再次输入相同的密码</div>
+            </div>
+
+            <button type="submit" class="register-btn" id="registerBtn">
+                📝 注册账号
+            </button>
+        </form>
+
+        <div class="divider">
+            <span>已有账号？</span>
+        </div>
+
+        <div class="login-link">
+            <p>立即 <a href="/login">登录</a>，继续管理您的书签</p>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script>
+        const AES_KEY = 'soloCoderBookmarkSecretKey2026Ab';
+        
+        function encryptPassword(password) {
+            const key = CryptoJS.enc.Utf8.parse(AES_KEY);
+            const iv = CryptoJS.lib.WordArray.random(16);
+            const encrypted = CryptoJS.AES.encrypt(password, key, {
+                iv: iv,
+                mode: CryptoJS.mode.CBC,
+                padding: CryptoJS.pad.Pkcs7
+            });
+            return iv.toString(CryptoJS.enc.Hex) + ':' + encrypted.toString();
+        }
+
+        function checkPasswordStrength(password) {
+            let strength = 0;
+            if (password.length >= 6) strength++;
+            if (password.length >= 10) strength++;
+            if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
+            if (/\d/.test(password)) strength++;
+            if (/[^a-zA-Z\d]/.test(password)) strength++;
+            return strength;
+        }
+
+        function updatePasswordStrength(strength) {
+            const bar = document.getElementById('passwordStrengthBar');
+            const hint = document.getElementById('passwordHint');
+            
+            bar.className = 'password-strength-bar';
+            
+            if (strength === 0) {
+                hint.textContent = '密码长度至少 6 个字符，建议包含大小写字母和数字';
+                hint.className = 'form-hint';
+            } else if (strength <= 2) {
+                bar.classList.add('weak');
+                hint.textContent = '密码强度：弱 - 建议使用更长的密码';
+                hint.className = 'form-hint error';
+            } else if (strength <= 3) {
+                bar.classList.add('medium');
+                hint.textContent = '密码强度：中等 - 可以更安全';
+                hint.className = 'form-hint';
+            } else {
+                bar.classList.add('strong');
+                hint.textContent = '密码强度：强 - 非常安全！';
+                hint.className = 'form-hint';
+            }
+        }
+
+        function showMessage(type, text) {
+            const container = document.getElementById('message-container');
+            container.innerHTML = `<div class="${type}-message">${text}</div>`;
+        }
+
+        function setLoading(loading) {
+            const btn = document.getElementById('registerBtn');
+            if (loading) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner"></span> 注册中...';
+            } else {
+                btn.disabled = false;
+                btn.innerHTML = '📝 注册账号';
+            }
+        }
+
+        function validateUsername(username) {
+            const regex = /^[a-zA-Z0-9_]{3,20}$/;
+            return regex.test(username);
+        }
+
+        const togglePasswordBtn = document.getElementById('togglePassword');
+        const passwordInput = document.getElementById('password');
+        
+        togglePasswordBtn.addEventListener('click', function() {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            togglePasswordBtn.textContent = type === 'password' ? '👁️' : '🙈';
+        });
+
+        const toggleConfirmPasswordBtn = document.getElementById('toggleConfirmPassword');
+        const confirmPasswordInput = document.getElementById('confirmPassword');
+        
+        toggleConfirmPasswordBtn.addEventListener('click', function() {
+            const type = confirmPasswordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            confirmPasswordInput.setAttribute('type', type);
+            toggleConfirmPasswordBtn.textContent = type === 'password' ? '👁️' : '🙈';
+        });
+
+        passwordInput.addEventListener('input', function() {
+            const strength = checkPasswordStrength(this.value);
+            updatePasswordStrength(strength);
+            
+            const confirmHint = document.getElementById('confirmPasswordHint');
+            if (confirmPasswordInput.value && confirmPasswordInput.value !== this.value) {
+                confirmHint.textContent = '两次输入的密码不一致';
+                confirmHint.className = 'form-hint error';
+            } else if (confirmPasswordInput.value) {
+                confirmHint.textContent = '密码匹配 ✓';
+                confirmHint.className = 'form-hint';
+            }
+        });
+
+        confirmPasswordInput.addEventListener('input', function() {
+            const hint = document.getElementById('confirmPasswordHint');
+            if (this.value && this.value !== passwordInput.value) {
+                hint.textContent = '两次输入的密码不一致';
+                hint.className = 'form-hint error';
+            } else if (this.value) {
+                hint.textContent = '密码匹配 ✓';
+                hint.className = 'form-hint';
+            } else {
+                hint.textContent = '请再次输入相同的密码';
+                hint.className = 'form-hint';
+            }
+        });
+
+        document.getElementById('registerForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            if (!username || !password || !confirmPassword) {
+                showMessage('error', '请填写所有必填项');
+                return;
+            }
+
+            if (!validateUsername(username)) {
+                showMessage('error', '用户名格式不正确，只能包含字母、数字和下划线，长度 3-20 个字符');
+                return;
+            }
+
+            if (password.length < 6) {
+                showMessage('error', '密码长度至少为 6 个字符');
+                return;
+            }
+
+            if (password !== confirmPassword) {
+                showMessage('error', '两次输入的密码不一致');
+                return;
+            }
+
+            setLoading(true);
+
+            try {
+                const encryptedPassword = encryptPassword(password);
+
+                const response = await fetch('/api/users/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: encryptedPassword,
+                        email: email || null
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showMessage('success', '注册成功！正在跳转到登录页面...');
+                    
+                    setTimeout(() => {
+                        window.location.href = '/login?registered=1';
+                    }, 1500);
+                } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    showMessage('error', errorData.detail || '注册失败，请稍后重试');
+                }
+            } catch (error) {
+                console.error('Register error:', error);
+                showMessage('error', '网络错误，请稍后重试');
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        document.getElementById('username').focus();
+    </script>
+</body>
+</html>

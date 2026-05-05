@@ -114,6 +114,10 @@
                 <a href="/">首页</a>
                 <a href="/categories">分类管理</a>
                 <a href="/add" class="btn">+ 添加书签</a>
+                {% if current_user %}
+                <span style="color: #666; margin-left: 15px;">👤 {{ current_user.username }}</span>
+                <a href="#" onclick="logout(); return false;" style="color: #dc3545; margin-left: 10px;">登出</a>
+                {% endif %}
             </nav>
         </header>
 
@@ -134,6 +138,18 @@
         </footer>
     </div>
 
+    <script>
+        function logout() {
+            fetch('/api/users/logout', {
+                method: 'POST',
+                credentials: 'same-origin'
+            }).then(function(response) {
+                window.location.href = '/login';
+            }).catch(function(error) {
+                window.location.href = '/login';
+            });
+        }
+    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

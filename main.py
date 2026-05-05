@@ -1,21 +1,94 @@
-from fastapi import FastAPI, HTTPException, Request, Form, Depends, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, HTTPException, Request, Form, Depends, status, Cookie
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.security.utils import get_authorization_scheme_param
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime
 from pathlib import Path
 import jinja2
 import secrets
+import uuid
 from passlib.context import CryptContext
+import base64
 
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, ForeignKey
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
 import json
 
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import unpad
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBasic(auto_error=False)
+
+AES_KEY = b'soloCoderBookmarkSecretKey2026Ab'
+assert len(AES_KEY) == 32, f"AES key must be 32 bytes (256 bits), got {len(AES_KEY)}"
+
+sessions: Dict[str, dict] = {}
+
+def decrypt_aes(encrypted_text: str) -> str:
+    try:
+        iv_hex, ciphertext_b64 = encrypted_text.split(':', 1)
+        iv = bytes.fromhex(iv_hex)
+        ciphertext = base64.b64decode(ciphertext_b64)
+        
+        cipher = AES.new(AES_KEY, AES.MODE_CBC, iv)
+        decrypted = unpad(cipher.decrypt(ciphertext), AES.block_size)
+        return decrypted.decode('utf-8')
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="密码解密失败"
+        )
+
+def create_session(user_id: int, username: str) -> str:
+    session_id = str(uuid.uuid4())
+    sessions[session_id] = {
+        "user_id": user_id,
+        "username": username,
+        "created_at": datetime.utcnow()
+    }
+    return session_id
+
+def get_session(session_id: Optional[str] = Cookie(None)):
+    if session_id and session_id in sessions:
+        return sessions[session_id]
+    return None
+
+async def get_current_user_web(request: Request, session: dict = Depends(get_session)):
+    if session is None:
+        return None
+    db = next(get_db())
+    user = get_user_by_id(db, session.get("user_id"))
+    return user
+
+class NotAuthenticatedException(Exception):
+    pass
+
+async def require_login_web(session: dict = Depends(get_session)):
+    if session is None:
+        raise NotAuthenticatedException()
+    db = next(get_db())
+    user = get_user_by_id(db, session.get("user_id"))
+    if not user:
+        raise NotAuthenticatedException()
+    return user
+
+async def get_current_user_api(session: dict = Depends(get_session)):
+    if session is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="未登录"
+        )
+    db = next(get_db())
+    user = get_user_by_id(db, session.get("user_id"))
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="用户不存在"
+        )
+    return user
 
 DB_HOST = "64.83.36.96"
 DB_PORT = "53306"
@@ -77,6 +150,10 @@ BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = BASE_DIR / "templates"
 
 app = FastAPI(title="网络书签管理器", description="一个简单的网络书签管理应用")
+
+@app.exception_handler(NotAuthenticatedException)
+async def not_authenticated_exception_handler(request: Request, exc: NotAuthenticatedException):
+    return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
 jinja_env = jinja2.Environment(
     loader=jinja2.FileSystemLoader(str(TEMPLATES_DIR)),
@@ -183,23 +260,6 @@ def db_user_to_dict(user_db: UserDB) -> dict:
         "created_at": user_db.created_at.isoformat() if user_db.created_at else None,
         "updated_at": user_db.updated_at.isoformat() if user_db.updated_at else None
     }
-
-async def get_current_user(credentials: HTTPBasicCredentials = Depends(security)):
-    if credentials is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="未提供认证信息",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    db = next(get_db())
-    user = get_user_by_username(db, credentials.username)
-    if not user or not verify_password(credentials.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="用户名或密码错误",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    return user
 
 def db_bookmark_to_dict(bookmark_db: BookmarkDB) -> dict:
     tags = []
@@ -444,6 +504,16 @@ def render_template(template_name: str, **context):
     template = jinja_env.get_template(template_name)
     return template.render(**context)
 
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    html_content = render_template("login.html", request=request, messages=[])
+    return HTMLResponse(content=html_content)
+
+@app.get("/register", response_class=HTMLResponse)
+async def register_page(request: Request):
+    html_content = render_template("register.html", request=request, messages=[])
+    return HTMLResponse(content=html_content)
+
 @app.post("/api/users/register", response_model=User)
 def register(user_data: UserCreate):
     db = next(get_db())
@@ -451,27 +521,60 @@ def register(user_data: UserCreate):
     if existing_user:
         raise HTTPException(status_code=400, detail="用户名已存在")
     
+    password = decrypt_aes(user_data.password)
+    
+    if len(password) < 6:
+        raise HTTPException(status_code=400, detail="密码长度至少为6个字符")
+    
     new_user = create_user_db(
         username=user_data.username,
-        password=user_data.password,
+        password=password,
         email=user_data.email
     )
     return db_user_to_dict(new_user)
 
-@app.post("/api/users/login", response_model=Token)
+@app.post("/api/users/login")
 def login(credentials: UserLogin):
     db = next(get_db())
     user = get_user_by_username(db, credentials.username)
-    if not user or not verify_password(credentials.password, user.password_hash):
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="用户名或密码错误",
-            headers={"WWW-Authenticate": "Basic"},
+            detail="用户名或密码错误"
         )
-    return Token(username=user.username, user_id=user.id)
+    
+    password = decrypt_aes(credentials.password)
+    
+    if not verify_password(password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="用户名或密码错误"
+        )
+    
+    session_id = create_session(user.id, user.username)
+    response = JSONResponse(content={"username": user.username, "user_id": user.id})
+    response.set_cookie(
+        key="session_id",
+        value=session_id,
+        httponly=True,
+        max_age=86400,
+        samesite="lax"
+    )
+    return response
+
+@app.post("/api/users/logout")
+def logout(session: dict = Depends(get_session)):
+    if session:
+        for key in list(sessions.keys()):
+            if sessions[key] == session:
+                del sessions[key]
+                break
+    response = JSONResponse(content={"message": "已登出"})
+    response.delete_cookie("session_id")
+    return response
 
 @app.get("/api/users/me", response_model=User)
-def get_current_user_info(current_user: UserDB = Depends(get_current_user)):
+def get_current_user_info(current_user: UserDB = Depends(get_current_user_api)):
     return db_user_to_dict(current_user)
 
 @app.get("/", response_class=HTMLResponse)
@@ -479,7 +582,7 @@ async def index(
     request: Request, 
     category_id: Optional[int] = None, 
     search: Optional[str] = None,
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(require_login_web)
 ):
     bookmarks = load_bookmarks(user_id=current_user.id, category_id=category_id, search_term=search)
     categories = load_categories(user_id=current_user.id)
@@ -497,14 +600,15 @@ async def index(
         all_categories=all_categories,
         current_category=current_category,
         search_term=search,
-        messages=[]
+        messages=[],
+        current_user=db_user_to_dict(current_user)
     )
     return HTMLResponse(content=html_content)
 
 @app.get("/categories", response_class=HTMLResponse)
 async def categories_list(
     request: Request,
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(require_login_web)
 ):
     categories = load_categories(user_id=current_user.id)
     all_categories = get_all_categories(user_id=current_user.id)
@@ -513,21 +617,23 @@ async def categories_list(
         request=request, 
         categories=categories,
         all_categories=all_categories,
-        messages=[]
+        messages=[],
+        current_user=db_user_to_dict(current_user)
     )
     return HTMLResponse(content=html_content)
 
 @app.get("/categories/add", response_class=HTMLResponse)
 async def add_category_form(
     request: Request,
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(require_login_web)
 ):
     all_categories = get_all_categories(user_id=current_user.id)
     html_content = render_template(
         "add_category.html", 
         request=request, 
         all_categories=all_categories,
-        messages=[]
+        messages=[],
+        current_user=db_user_to_dict(current_user)
     )
     return HTMLResponse(content=html_content)
 
@@ -536,7 +642,7 @@ async def add_category(
     name: str = Form(...),
     description: Optional[str] = Form(None),
     parent_id: Optional[int] = Form(None),
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(require_login_web)
 ):
     create_category_db(
         user_id=current_user.id,
@@ -550,7 +656,7 @@ async def add_category(
 async def edit_category_form(
     request: Request, 
     category_id: int,
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(require_login_web)
 ):
     category = get_category_by_id(category_id, user_id=current_user.id)
     if not category:
@@ -562,7 +668,8 @@ async def edit_category_form(
         request=request, 
         category=category,
         all_categories=all_categories,
-        messages=[]
+        messages=[],
+        current_user=db_user_to_dict(current_user)
     )
     return HTMLResponse(content=html_content)
 
@@ -572,7 +679,7 @@ async def edit_category(
     name: str = Form(...),
     description: Optional[str] = Form(None),
     parent_id: Optional[int] = Form(None),
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(require_login_web)
 ):
     update_category_db(
         category_id=category_id,
@@ -586,7 +693,7 @@ async def edit_category(
 @app.get("/categories/delete/{category_id}", response_class=RedirectResponse)
 async def delete_category_web(
     category_id: int,
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(require_login_web)
 ):
     delete_category_db(category_id, user_id=current_user.id)
     return RedirectResponse(url="/categories", status_code=303)
@@ -594,14 +701,15 @@ async def delete_category_web(
 @app.get("/add", response_class=HTMLResponse)
 async def add_bookmark_form(
     request: Request,
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(require_login_web)
 ):
     all_categories = get_all_categories(user_id=current_user.id)
     html_content = render_template(
         "add.html", 
         request=request, 
         all_categories=all_categories,
-        messages=[]
+        messages=[],
+        current_user=db_user_to_dict(current_user)
     )
     return HTMLResponse(content=html_content)
 
@@ -612,7 +720,7 @@ async def add_bookmark(
     description: Optional[str] = Form(None),
     tags: Optional[str] = Form(None),
     category_id: Optional[int] = Form(None),
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(require_login_web)
 ):
     tags_list = []
     if tags:
@@ -632,7 +740,7 @@ async def add_bookmark(
 async def edit_bookmark_form(
     request: Request, 
     bookmark_id: int,
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(require_login_web)
 ):
     bookmark = get_bookmark_by_id(bookmark_id, user_id=current_user.id)
     if not bookmark:
@@ -644,7 +752,8 @@ async def edit_bookmark_form(
         request=request, 
         bookmark=bookmark,
         all_categories=all_categories,
-        messages=[]
+        messages=[],
+        current_user=db_user_to_dict(current_user)
     )
     return HTMLResponse(content=html_content)
 
@@ -656,7 +765,7 @@ async def edit_bookmark(
     description: Optional[str] = Form(None),
     tags: Optional[str] = Form(None),
     category_id: Optional[int] = Form(None),
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(require_login_web)
 ):
     tags_list = []
     if tags:
@@ -676,7 +785,7 @@ async def edit_bookmark(
 @app.get("/delete/{bookmark_id}", response_class=RedirectResponse)
 async def delete_bookmark_web(
     bookmark_id: int,
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(require_login_web)
 ):
     delete_bookmark_db(bookmark_id, user_id=current_user.id)
     return RedirectResponse(url="/", status_code=303)
@@ -685,14 +794,14 @@ async def delete_bookmark_web(
 def get_bookmarks(
     category_id: Optional[int] = None, 
     search: Optional[str] = None,
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(get_current_user_api)
 ):
     return load_bookmarks(user_id=current_user.id, category_id=category_id, search_term=search)
 
 @app.get("/api/bookmarks/{bookmark_id}", response_model=Bookmark)
 def get_bookmark(
     bookmark_id: int,
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(get_current_user_api)
 ):
     bookmark = get_bookmark_by_id(bookmark_id, user_id=current_user.id)
     if bookmark:
@@ -702,7 +811,7 @@ def get_bookmark(
 @app.post("/api/bookmarks", response_model=Bookmark)
 def create_bookmark(
     bookmark: BookmarkBase,
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(get_current_user_api)
 ):
     new_bookmark = create_bookmark_db(
         user_id=current_user.id,
@@ -718,7 +827,7 @@ def create_bookmark(
 def update_bookmark(
     bookmark_id: int, 
     bookmark_update: BookmarkUpdate,
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(get_current_user_api)
 ):
     update_data = bookmark_update.dict(exclude_unset=True)
     updated_bookmark = update_bookmark_db(
@@ -737,7 +846,7 @@ def update_bookmark(
 @app.delete("/api/bookmarks/{bookmark_id}")
 def delete_bookmark(
     bookmark_id: int,
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(get_current_user_api)
 ):
     success = delete_bookmark_db(bookmark_id, user_id=current_user.id)
     if success:
@@ -746,20 +855,20 @@ def delete_bookmark(
 
 @app.get("/api/categories", response_model=List[Category])
 def get_categories(
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(get_current_user_api)
 ):
     return load_categories(user_id=current_user.id)
 
 @app.get("/api/categories/all", response_model=List[Category])
 def get_all_categories_api(
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(get_current_user_api)
 ):
     return get_all_categories(user_id=current_user.id)
 
 @app.get("/api/categories/{category_id}", response_model=Category)
 def get_category(
     category_id: int,
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(get_current_user_api)
 ):
     category = get_category_by_id(category_id, user_id=current_user.id)
     if category:
@@ -769,7 +878,7 @@ def get_category(
 @app.post("/api/categories", response_model=Category)
 def create_category(
     category: CategoryBase,
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(get_current_user_api)
 ):
     new_category = create_category_db(
         user_id=current_user.id,
@@ -783,7 +892,7 @@ def create_category(
 def update_category(
     category_id: int, 
     category_update: CategoryUpdate,
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(get_current_user_api)
 ):
     update_data = category_update.dict(exclude_unset=True)
     updated_category = update_category_db(
@@ -800,7 +909,7 @@ def update_category(
 @app.delete("/api/categories/{category_id}")
 def delete_category(
     category_id: int,
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(get_current_user_api)
 ):
     success = delete_category_db(category_id, user_id=current_user.id)
     if success:

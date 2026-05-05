@@ -1,6 +1,22 @@
 {% extends "base.html" %}
 
-{% block title %}首页 - 网络书签管理器{% endblock %}
+{% macro render_category(category, level=0) %}
+<li class="category-item">
+    <a href="/?category_id={{ category.id }}" class="category-link {% if current_category and current_category.id == category.id %}active{% endif %}">
+        <span class="category-name">
+            {% if level == 0 %}📁{% else %}📄{% endif %} {{ category.name }}
+        </span>
+        <span class="category-count">{{ category.bookmark_count }}</span>
+    </a>
+    {% if category.children %}
+    <ul class="sub-categories">
+        {% for child in category.children %}
+            {{ render_category(child, level + 1) }}
+        {% endfor %}
+    </ul>
+    {% endif %}
+</li>
+{% endmacro %}
 
 {% block extra_css %}
 <style>
@@ -358,28 +374,7 @@
             {% if categories %}
             <ul class="category-list">
                 {% for category in categories %}
-                <li class="category-item">
-                    <a href="/?category_id={{ category.id }}" class="category-link {% if current_category and current_category.id == category.id %}active{% endif %}">
-                        <span class="category-name">
-                            📁 {{ category.name }}
-                        </span>
-                        <span class="category-count">{{ category.bookmark_count }}</span>
-                    </a>
-                    {% if category.children %}
-                    <ul class="sub-categories">
-                        {% for child in category.children %}
-                        <li class="category-item">
-                            <a href="/?category_id={{ child.id }}" class="category-link {% if current_category and current_category.id == child.id %}active{% endif %}">
-                                <span class="category-name">
-                                    📄 {{ child.name }}
-                                </span>
-                                <span class="category-count">{{ child.bookmark_count }}</span>
-                            </a>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                    {% endif %}
-                </li>
+                    {{ render_category(category, 0) }}
                 {% endfor %}
             </ul>
             {% endif %}

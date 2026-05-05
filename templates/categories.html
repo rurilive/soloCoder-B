@@ -1,5 +1,38 @@
 {% extends "base.html" %}
 
+{% macro render_category_item(category, level=0) %}
+<div class="{% if level == 0 %}category-item{% else %}sub-category-item{% endif %}" style="margin-left: {% if level > 0 %}{{ level * 20 }}px{% endif %}">
+    <div class="category-header">
+        <div>
+            <div class="category-name">
+                {% if level == 0 %}📁{% else %}📄{% endif %} {{ category.name }}
+            </div>
+            {% if category.description %}
+            <div class="category-description">{{ category.description }}</div>
+            {% endif %}
+        </div>
+        <div class="category-actions">
+            <a href="/categories/edit/{{ category.id }}" class="btn-edit">✏️ 编辑</a>
+            <a href="/categories/delete/{{ category.id }}" class="btn-delete" onclick="return confirm('确定要删除这个分类吗？子分类将被提升到上一级，相关书签将取消分类。');">🗑️ 删除</a>
+        </div>
+    </div>
+    <div class="category-stats">
+        <span>📚 书签数量: {{ category.bookmark_count }}</span>
+        {% if category.children %}
+        <span>📂 子分类: {{ category.children|length }}</span>
+        {% endif %}
+    </div>
+
+    {% if category.children %}
+    <div class="sub-categories">
+        {% for child in category.children %}
+            {{ render_category_item(child, level + 1) }}
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endmacro %}
+
 {% block title %}分类管理 - 网络书签管理器{% endblock %}
 
 {% block extra_css %}
@@ -120,7 +153,7 @@
     }
 
     .sub-categories {
-        margin-left: 30px;
+        margin-left: 20px;
         margin-top: 15px;
         border-left: 2px solid #e9ecef;
         padding-left: 20px;
@@ -180,54 +213,7 @@
 {% if categories %}
 <div class="categories-tree">
     {% for category in categories %}
-    <div class="category-item">
-        <div class="category-header">
-            <div>
-                <div class="category-name">
-                    📁 {{ category.name }}
-                </div>
-                {% if category.description %}
-                <div class="category-description">{{ category.description }}</div>
-                {% endif %}
-            </div>
-            <div class="category-actions">
-                <a href="/categories/edit/{{ category.id }}" class="btn-edit">✏️ 编辑</a>
-                <a href="/categories/delete/{{ category.id }}" class="btn-delete" onclick="return confirm('确定要删除这个分类吗？子分类将被提升到上一级，相关书签将取消分类。');">🗑️ 删除</a>
-            </div>
-        </div>
-        <div class="category-stats">
-            <span>📚 书签数量: {{ category.bookmark_count }}</span>
-            {% if category.children %}
-            <span>📂 子分类: {{ category.children|length }}</span>
-            {% endif %}
-        </div>
-
-        {% if category.children %}
-        <div class="sub-categories">
-            {% for child in category.children %}
-            <div class="sub-category-item">
-                <div class="category-header">
-                    <div>
-                        <div class="category-name">
-                            📄 {{ child.name }}
-                        </div>
-                        {% if child.description %}
-                        <div class="category-description">{{ child.description }}</div>
-                        {% endif %}
-                    </div>
-                    <div class="category-actions">
-                        <a href="/categories/edit/{{ child.id }}" class="btn-edit">✏️ 编辑</a>
-                        <a href="/categories/delete/{{ child.id }}" class="btn-delete" onclick="return confirm('确定要删除这个分类吗？');">🗑️ 删除</a>
-                    </div>
-                </div>
-                <div class="category-stats">
-                    <span>📚 书签数量: {{ child.bookmark_count }}</span>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
-    </div>
+        {{ render_category_item(category, 0) }}
     {% endfor %}
 </div>
 {% else %}

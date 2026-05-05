@@ -1,30 +1,45 @@
 {% extends "base.html" %}
 
 {% macro render_category_item(category, level=0) %}
-<div class="{% if level == 0 %}category-item{% else %}sub-category-item{% endif %}" style="margin-left: {% if level > 0 %}{{ level * 20 }}px{% endif %}">
-    <div class="category-header">
-        <div>
-            <div class="category-name">
-                {% if level == 0 %}📁{% else %}📄{% endif %} {{ category.name }}
-            </div>
-            {% if category.description %}
-            <div class="category-description">{{ category.description }}</div>
-            {% endif %}
-        </div>
-        <div class="category-actions">
-            <a href="/categories/edit/{{ category.id }}" class="btn-edit">✏️ 编辑</a>
-            <a href="/categories/delete/{{ category.id }}" class="btn-delete" onclick="return confirm('确定要删除这个分类吗？子分类将被提升到上一级，相关书签将取消分类。');">🗑️ 删除</a>
-        </div>
-    </div>
-    <div class="category-stats">
-        <span>📚 书签数量: {{ category.bookmark_count }}</span>
+<div class="{% if level == 0 %}category-item{% else %}sub-category-item{% endif %}" 
+     style="margin-left: {% if level > 0 %}{{ level * 15 }}px{% endif %}"
+     data-category-id="{{ category.id }}">
+    <div class="category-row">
         {% if category.children %}
-        <span>📂 子分类: {{ category.children|length }}</span>
+        <button class="toggle-btn" 
+                data-toggle="{{ category.id }}" 
+                onclick="toggleCategory({{ category.id }})">
+            ▶
+        </button>
+        {% else %}
+        <span class="toggle-placeholder"></span>
         {% endif %}
+        <div style="flex: 1;">
+            <div class="category-header">
+                <div>
+                    <div class="category-name">
+                        {% if level == 0 %}📁{% else %}📄{% endif %} {{ category.name }}
+                    </div>
+                    {% if category.description %}
+                    <div class="category-description">{{ category.description }}</div>
+                    {% endif %}
+                </div>
+                <div class="category-actions">
+                    <a href="/categories/edit/{{ category.id }}" class="btn-edit">✏️ 编辑</a>
+                    <a href="/categories/delete/{{ category.id }}" class="btn-delete" onclick="return confirm('确定要删除这个分类吗？子分类将被提升到上一级，相关书签将取消分类。');">🗑️ 删除</a>
+                </div>
+            </div>
+            <div class="category-stats">
+                <span>📚 书签数量: {{ category.bookmark_count }}</span>
+                {% if category.children %}
+                <span>📂 子分类: {{ category.children|length }}</span>
+                {% endif %}
+            </div>
+        </div>
     </div>
 
     {% if category.children %}
-    <div class="sub-categories">
+    <div class="sub-categories collapsed" id="sub-categories-{{ category.id }}">
         {% for child in category.children %}
             {{ render_category_item(child, level + 1) }}
         {% endfor %}
@@ -63,6 +78,22 @@
         opacity: 0.9;
     }
 
+    .expand-all-btn {
+        font-size: 12px;
+        padding: 4px 8px;
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background 0.3s;
+        margin-left: 10px;
+    }
+
+    .expand-all-btn:hover {
+        background: #5568d3;
+    }
+
     .categories-container {
         display: flex;
         gap: 30px;
@@ -75,8 +106,8 @@
     .category-item {
         background: #f8f9fa;
         border-radius: 8px;
-        padding: 20px;
-        margin-bottom: 15px;
+        padding: 15px;
+        margin-bottom: 10px;
         border: 1px solid #e9ecef;
         transition: all 0.3s;
     }
@@ -85,32 +116,69 @@
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     }
 
+    .category-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .toggle-btn {
+        width: 20px;
+        height: 20px;
+        padding: 0;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        font-size: 10px;
+        color: #999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.2s, color 0.2s;
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+
+    .toggle-btn:hover {
+        color: #667eea;
+    }
+
+    .toggle-btn.expanded {
+        transform: rotate(90deg);
+    }
+
+    .toggle-placeholder {
+        width: 20px;
+        flex-shrink: 0;
+    }
+
     .category-header {
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
     }
 
     .category-name {
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 600;
         color: #333;
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
+        margin-bottom: 4px;
     }
 
     .category-actions {
         display: flex;
-        gap: 10px;
+        gap: 8px;
     }
 
     .category-actions a {
-        padding: 6px 12px;
+        padding: 5px 10px;
         border-radius: 4px;
         text-decoration: none;
-        font-size: 13px;
+        font-size: 12px;
         transition: all 0.3s;
     }
 
@@ -140,9 +208,9 @@
 
     .category-description {
         color: #555;
-        font-size: 14px;
+        font-size: 13px;
         line-height: 1.5;
-        margin-bottom: 10px;
+        margin-bottom: 6px;
     }
 
     .category-stats {
@@ -153,17 +221,25 @@
     }
 
     .sub-categories {
-        margin-left: 20px;
-        margin-top: 15px;
-        border-left: 2px solid #e9ecef;
-        padding-left: 20px;
+        margin-top: 10px;
+        overflow: hidden;
+        max-height: 2000px;
+        transition: max-height 0.3s ease-out, opacity 0.2s ease-out;
+        opacity: 1;
+    }
+
+    .sub-categories.collapsed {
+        max-height: 0;
+        opacity: 0;
+        pointer-events: none;
+        margin-top: 0;
     }
 
     .sub-category-item {
         background: white;
         border-radius: 6px;
-        padding: 15px;
-        margin-bottom: 10px;
+        padding: 12px;
+        margin-bottom: 8px;
         border: 1px solid #e9ecef;
     }
 
@@ -206,7 +282,12 @@
 
 {% block content %}
 <div class="page-header">
-    <h2>📁 分类管理</h2>
+    <div style="display: flex; align-items: center;">
+        <h2>📁 分类管理</h2>
+        <button class="expand-all-btn" onclick="toggleAllCategories()">
+            展开全部
+        </button>
+    </div>
     <a href="/categories/add" class="btn-add">➕ 添加分类</a>
 </div>
 
@@ -223,4 +304,49 @@
     <a href="/categories/add">➕ 添加第一个分类</a>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let allExpanded = false;
+
+    function toggleCategory(categoryId) {
+        const subCategories = document.getElementById('sub-categories-' + categoryId);
+        const toggleBtn = document.querySelector('[data-toggle="' + categoryId + '"]');
+        
+        if (subCategories.classList.contains('collapsed')) {
+            subCategories.classList.remove('collapsed');
+            toggleBtn.classList.add('expanded');
+        } else {
+            subCategories.classList.add('collapsed');
+            toggleBtn.classList.remove('expanded');
+        }
+    }
+
+    function toggleAllCategories() {
+        const subCategories = document.querySelectorAll('.sub-categories');
+        const toggleBtns = document.querySelectorAll('.toggle-btn');
+        const expandBtn = document.querySelector('.expand-all-btn');
+        
+        allExpanded = !allExpanded;
+        
+        subCategories.forEach(el => {
+            if (allExpanded) {
+                el.classList.remove('collapsed');
+            } else {
+                el.classList.add('collapsed');
+            }
+        });
+        
+        toggleBtns.forEach(btn => {
+            if (allExpanded) {
+                btn.classList.add('expanded');
+            } else {
+                btn.classList.remove('expanded');
+            }
+        });
+        
+        expandBtn.textContent = allExpanded ? '折叠全部' : '展开全部';
+    }
+</script>
 {% endblock %}

@@ -1,17 +1,29 @@
 {% extends "base.html" %}
 
-{% macro render_category(category, level=0) %}
-<li class="category-item">
-    <a href="/?category_id={{ category.id }}" class="category-link {% if current_category and current_category.id == category.id %}active{% endif %}">
-        <span class="category-name">
-            {% if level == 0 %}📁{% else %}📄{% endif %} {{ category.name }}
-        </span>
-        <span class="category-count">{{ category.bookmark_count }}</span>
-    </a>
+{% macro render_category(category, level=0, is_expanded=False) %}
+<li class="category-item" data-category-id="{{ category.id }}" data-level="{{ level }}">
+    <div class="category-row">
+        {% if category.children %}
+        <button class="toggle-btn {% if is_expanded %}expanded{% endif %}" 
+                data-toggle="{{ category.id }}" 
+                onclick="toggleCategory({{ category.id }})">
+            {% if is_expanded %}▼{% else %}▶{% endif %}
+        </button>
+        {% else %}
+        <span class="toggle-placeholder"></span>
+        {% endif %}
+        <a href="/?category_id={{ category.id }}" 
+           class="category-link {% if current_category and current_category.id == category.id %}active{% endif %}">
+            <span class="category-name">
+                {% if level == 0 %}📁{% else %}📄{% endif %} {{ category.name }}
+            </span>
+            <span class="category-count">{{ category.bookmark_count }}</span>
+        </a>
+    </div>
     {% if category.children %}
-    <ul class="sub-categories">
+    <ul class="sub-categories {% if not is_expanded %}collapsed{% endif %}" id="sub-categories-{{ category.id }}">
         {% for child in category.children %}
-            {{ render_category(child, level + 1) }}
+            {{ render_category(child, level + 1, is_expanded) }}
         {% endfor %}
     </ul>
     {% endif %}
@@ -26,7 +38,7 @@
     }
 
     .sidebar {
-        width: 250px;
+        width: 280px;
         flex-shrink: 0;
     }
 
@@ -48,6 +60,24 @@
         margin-bottom: 15px;
         padding-bottom: 10px;
         border-bottom: 1px solid #e9ecef;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .expand-all-btn {
+        font-size: 12px;
+        padding: 4px 8px;
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+
+    .expand-all-btn:hover {
+        background: #5568d3;
     }
 
     .category-list {
@@ -57,18 +87,56 @@
     }
 
     .category-item {
-        margin-bottom: 5px;
+        margin-bottom: 2px;
+    }
+
+    .category-row {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+    }
+
+    .toggle-btn {
+        width: 20px;
+        height: 20px;
+        padding: 0;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        font-size: 10px;
+        color: #999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.2s, color 0.2s;
+        flex-shrink: 0;
+    }
+
+    .toggle-btn:hover {
+        color: #667eea;
+    }
+
+    .toggle-btn.expanded {
+        transform: rotate(90deg);
+    }
+
+    .toggle-placeholder {
+        width: 20px;
+        flex-shrink: 0;
     }
 
     .category-link {
+        flex: 1;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 8px 12px;
+        padding: 6px 8px;
         border-radius: 4px;
         text-decoration: none;
         color: #555;
         transition: all 0.3s;
+        min-width: 0;
+        overflow: hidden;
     }
 
     .category-link:hover,
@@ -80,14 +148,20 @@
     .category-name {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
     }
 
     .category-count {
         background: rgba(0, 0, 0, 0.1);
-        padding: 2px 8px;
+        padding: 2px 6px;
         border-radius: 10px;
-        font-size: 12px;
+        font-size: 11px;
+        flex-shrink: 0;
+        margin-left: 4px;
     }
 
     .category-link:hover .category-count,
@@ -97,15 +171,33 @@
 
     .sub-categories {
         list-style: none;
-        padding-left: 20px;
-        margin-top: 5px;
+        padding-left: 15px;
+        margin-top: 2px;
+        overflow: hidden;
+        max-height: 2000px;
+        transition: max-height 0.3s ease-out, opacity 0.2s ease-out;
+        opacity: 1;
+    }
+
+    .sub-categories.collapsed {
+        max-height: 0;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .sub-categories .category-item[data-level="1"] {
+        padding-left: 0;
+    }
+
+    .sub-categories .category-item[data-level="2"] {
+        padding-left: 0;
     }
 
     .all-categories-link {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 8px 12px;
+        padding: 8px 10px;
         border-radius: 4px;
         text-decoration: none;
         color: #555;
@@ -358,6 +450,48 @@
     .clear-filter-link:hover {
         opacity: 0.8;
     }
+
+    .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+        margin-top: 30px;
+        padding: 20px 0;
+    }
+
+    .pagination-btn {
+        padding: 8px 16px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        background: white;
+        color: #666;
+        text-decoration: none;
+        font-size: 14px;
+        transition: all 0.3s;
+    }
+
+    .pagination-btn:hover:not(.disabled):not(.active) {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+    }
+
+    .pagination-btn.active {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+    }
+
+    .pagination-btn.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .pagination-info {
+        color: #999;
+        font-size: 13px;
+    }
 </style>
 {% endblock %}
 
@@ -365,16 +499,21 @@
 <div class="main-container">
     <div class="sidebar">
         <div class="sidebar-section">
-            <h3>📁 分类</h3>
+            <h3>
+                <span>📁 分类</span>
+                <button class="expand-all-btn" onclick="toggleAllCategories()">
+                    展开全部
+                </button>
+            </h3>
             <a href="/" class="all-categories-link {% if not current_category %}active{% endif %}">
                 <span>📂 全部书签</span>
                 <span class="category-count">{{ bookmarks|length }}</span>
             </a>
             
             {% if categories %}
-            <ul class="category-list">
+            <ul class="category-list" id="category-list">
                 {% for category in categories %}
-                    {{ render_category(category, 0) }}
+                    {{ render_category(category, 0, False) }}
                 {% endfor %}
             </ul>
             {% endif %}
@@ -474,9 +613,74 @@
 
 {% block extra_js %}
 <script>
+    let allExpanded = false;
+
+    function toggleCategory(categoryId) {
+        const subCategories = document.getElementById('sub-categories-' + categoryId);
+        const toggleBtn = document.querySelector('[data-toggle="' + categoryId + '"]');
+        
+        if (subCategories.classList.contains('collapsed')) {
+            subCategories.classList.remove('collapsed');
+            toggleBtn.classList.add('expanded');
+        } else {
+            subCategories.classList.add('collapsed');
+            toggleBtn.classList.remove('expanded');
+        }
+    }
+
+    function toggleAllCategories() {
+        const subCategories = document.querySelectorAll('.sub-categories');
+        const toggleBtns = document.querySelectorAll('.toggle-btn');
+        const expandBtn = document.querySelector('.expand-all-btn');
+        
+        allExpanded = !allExpanded;
+        
+        subCategories.forEach(el => {
+            if (allExpanded) {
+                el.classList.remove('collapsed');
+            } else {
+                el.classList.add('collapsed');
+            }
+        });
+        
+        toggleBtns.forEach(btn => {
+            if (allExpanded) {
+                btn.classList.add('expanded');
+            } else {
+                btn.classList.remove('expanded');
+            }
+        });
+        
+        expandBtn.textContent = allExpanded ? '折叠全部' : '展开全部';
+    }
+
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
         searchInput.focus();
     }
+
+    function expandToCategory(categoryId) {
+        if (!categoryId) return;
+        
+        const categoryItem = document.querySelector('.category-item[data-category-id="' + categoryId + '"]');
+        if (!categoryItem) return;
+        
+        let parent = categoryItem.parentElement;
+        while (parent) {
+            if (parent.classList.contains('sub-categories') && parent.classList.contains('collapsed')) {
+                parent.classList.remove('collapsed');
+                const categoryIdFromId = parent.id.replace('sub-categories-', '');
+                const toggleBtn = document.querySelector('[data-toggle="' + categoryIdFromId + '"]');
+                if (toggleBtn) {
+                    toggleBtn.classList.add('expanded');
+                }
+            }
+            parent = parent.parentElement;
+        }
+    }
+
+    {% if current_category %}
+    expandToCategory({{ current_category.id }});
+    {% endif %}
 </script>
 {% endblock %}
